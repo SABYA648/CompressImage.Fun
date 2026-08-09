@@ -40,8 +40,12 @@ services:
     depends_on:
       processor:
         condition: service_healthy
-    ports:
-      - '${PUBLIC_PORT:-8080}:8080'
+    # No host port publish. Coolify routes https://compressimage.fun to
+    # container port 8080 over the Compose network. For local localhost:8080
+    # access, use docker-compose.override.yml (gitignored) or:
+    #   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+    expose:
+      - '8080'
     read_only: true
     tmpfs:
       # Runtime tmpfs mounts hide the image-layer ownership, so grant the

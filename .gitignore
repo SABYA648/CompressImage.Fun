@@ -8,4 +8,5 @@ test-results/
 artifacts/
 *.log
 .DS_Store
+docker-compose.override.yml
 

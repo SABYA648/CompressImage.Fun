@@ -37,13 +37,17 @@ const execFileAsync = promisify(execFile);
 /**
  * The bundled libvips decodes AV1 but ships no HEVC decoder, so HEIC pixel data is
  * unreadable through sharp alone. libheif's heif-convert handles it when the image
- * carries the tool, so probe once and treat it as an optional capability: without it
- * HEIC uploads still fail cleanly instead of breaking the rest of the service.
+ * carries the tool and an HEVC decoder. Probe once via --list-decoders (works on
+ * bookworm 1.15 and newer plugin-era builds; --version is not portable) and treat
+ * it as optional: without a real HEVC decoder HEIC uploads fail cleanly.
  */
 let heicDecoderProbe: Promise<boolean> | undefined;
 const heicDecoderAvailable = (): Promise<boolean> => {
-  heicDecoderProbe ??= execFileAsync('heif-convert', ['--version'], { timeout: 5000 }).then(
-    () => true,
+  heicDecoderProbe ??= execFileAsync('heif-convert', ['--list-decoders'], {
+    timeout: 5000,
+    encoding: 'utf8',
+  }).then(
+    ({ stdout, stderr }) => /libde265|hevc/i.test(`${stdout}\n${stderr}`),
     () => false,
   );
   return heicDecoderProbe;

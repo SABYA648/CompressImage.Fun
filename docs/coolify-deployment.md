@@ -4,34 +4,49 @@ Everything below is taken from `docker-compose.yml`, `Dockerfile`, and
 `apps/processor/src/config.ts`. Deploy the revision recorded in
 `docs/test-evidence.md`.
 
-## Deployment mode
+## Coolify project settings (exact)
 
-Docker Compose. Point Coolify at this repository and use `docker-compose.yml` as
-the compose file. Do not deploy the two images as separate applications, because
-the web service resolves the processor by its Compose service name over the
-internal network.
+| Field                   | Value                 |
+| ----------------------- | --------------------- |
+| Build Pack              | Docker Compose        |
+| Base Directory          | `/`                   |
+| Docker Compose Location | `/docker-compose.yml` |
 
-The `e2e` service sits behind the `qa` profile and never starts in a normal
-deploy. Do not enable that profile in production.
+Do not deploy the two images as separate applications. The web service resolves
+the processor by its Compose service name over the internal network.
 
-## Public service and port
+## Domains (Coolify UI)
 
-| Item           | Value                       |
-| -------------- | --------------------------- |
-| Public service | `web`                       |
-| Container port | `8080`                      |
-| Host mapping   | `${PUBLIC_PORT:-8080}:8080` |
-| Domain         | `https://compressimage.fun` |
+| Service     | Domains                         |
+| ----------- | ------------------------------- |
+| `processor` | blank (no domain)               |
+| `web`       | `https://compressimage.fun:8080` |
+| `e2e`       | blank (no domain)               |
 
-`web` is the only service with a published port. `processor` has no `ports` entry
-and is attached to a network declared `internal: true`, so it is not reachable
-from the host or the internet. Keep it that way: the processor must only be
-reached through `web`, which proxies `/api/`, `/health`, and `/ready` to it.
+The `:8080` in Coolify's domain field is the **internal container target port**.
+It tells Coolify's reverse proxy to forward to port 8080 inside the `web`
+container. It is **not** part of the public URL.
 
-## TLS
+Public canonical URL remains:
 
-Coolify's proxy terminates TLS and forwards plain HTTP to port 8080. The
-application does not terminate TLS and must not be configured to.
+`https://compressimage.fun`
+
+Coolify must route:
+
+Internet → Coolify proxy → `web:8080` → `processor` on the internal network
+
+Do not publish host port 8080 on the VPS. Production `docker-compose.yml` does
+not map `0.0.0.0:8080`; `web` only exposes container port 8080 on the Compose
+network. Local developers who want `http://127.0.0.1:8080` should use
+`docker-compose.local.yml` (localhost-only publish).
+
+## QA profile
+
+The `e2e` service sits behind `profiles: [qa]` and never starts in a normal
+deploy. Leave the QA profile disabled in Coolify. Do not treat `e2e` as a
+required health component.
+
+Normal `docker compose up -d` starts only `processor` and `web`.
 
 ## Persistent storage
 
@@ -41,10 +56,11 @@ application does not terminate TLS and must not be configured to.
 | Container path | `/data/jobs`     |
 | Compose volume | `jobs`           |
 
-The volume is required. Jobs are stored on disk with a four hour lifetime, so a
-container restart during that window would otherwise drop files the site promises
-to keep until they expire. The directory is created in the image owned by the
-`node` user, which the processor runs as. Do not mount it into `web`.
+Defined by Compose: `jobs` → `processor:/data/jobs`. The volume is required.
+Jobs are stored on disk with a four hour lifetime, so a container restart during
+that window would otherwise drop files the site promises to keep until they
+expire. The directory is created in the image owned by the `node` user, which
+the processor runs as. Do not mount it into `web`.
 
 The processor's root filesystem is read only, with a small tmpfs at `/tmp`. That
 is intentional. Only `/data/jobs` needs to be writable.
@@ -53,7 +69,7 @@ is intentional. Only `/data/jobs` needs to be writable.
 
 | Item          | Value             |
 | ------------- | ----------------- |
-| Health path   | `/health`         |
+| Health path   | `/health` on `web` |
 | Expected body | `{"status":"ok"}` |
 
 Configure Coolify's health check against `/health` on the `web` service. It is a
@@ -65,14 +81,26 @@ distinguish readiness from liveness, but Coolify only needs `/health`. Both
 Compose services already define their own `HEALTHCHECK`, and `web` waits for
 `processor` to report healthy before it starts.
 
+## Network isolation
+
+`processor` has no domain, no host port mapping, and is attached only to the
+`internal` network (`internal: true`). There is no separate public processor and
+no `api.compressimage.fun`. Reach it only through `web`, which proxies `/api/`,
+`/health`, and `/ready`.
+
+## TLS
+
+Coolify's proxy terminates TLS and forwards plain HTTP to container port 8080.
+The application does not terminate TLS and must not be configured to.
+
 ## Environment variables
 
 All processing variables are optional and fall back to the defaults below, which
 are the values the release was tested with. Set them only to change behaviour.
+No secrets are required.
 
 | Variable                          | Default      | Meaning                                           |
 | --------------------------------- | ------------ | ------------------------------------------------- |
-| `PUBLIC_PORT`                     | `8080`       | Host port mapped to the web container             |
 | `FILE_TTL_SECONDS`                | `14400`      | Temporary file lifetime, four hours. Minimum 60   |
 | `TEMP_STORAGE_DIR`                | `/data/jobs` | Must match the volume mount                       |
 | `PROCESS_CONCURRENCY`             | `2`          | Jobs processed at once. Maximum 8                 |
@@ -88,9 +116,12 @@ are the values the release was tested with. Set them only to change behaviour.
 | `PUBLIC_GOOGLE_SITE_VERIFICATION` | empty        | Build time, optional                              |
 | `PUBLIC_BING_SITE_VERIFICATION`   | empty        | Build time, optional                              |
 
+`PUBLIC_GA_MEASUREMENT_ID` is optional and must not be required for deployment.
+Leaving it empty is supported: no analytics request is made and no console error
+appears.
+
 The three `PUBLIC_` values are read when the static site is built, so changing
-them requires a rebuild, not just a restart. Leaving `PUBLIC_GA_MEASUREMENT_ID`
-empty is supported: no analytics request is made and no console error appears.
+them requires a rebuild, not just a restart.
 
 On the intended 4 vCPU and 16 GB host, keep `PROCESS_CONCURRENCY` and
 `SHARP_CONCURRENCY` at 2. Two jobs times two libvips threads matches the core
