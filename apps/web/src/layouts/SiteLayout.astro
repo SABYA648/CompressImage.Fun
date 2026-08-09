@@ -1,0 +1,154 @@
+---
+import '../styles/global.css';
+import { tools, toolPath } from '../data/tools';
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath?: string;
+  pageType?: 'tool' | 'article' | 'page';
+  h1?: string;
+}
+
+const {
+  title,
+  description,
+  canonicalPath = Astro.url.pathname,
+  pageType = 'page',
+  h1,
+} = Astro.props;
+const canonical = new URL(canonicalPath || '/', 'https://compressimage.fun').toString();
+const verificationGoogle = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION;
+const verificationBing = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
+const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID;
+const safeGaId = /^G-[A-Z0-9]+$/.test(gaId ?? '') ? gaId : undefined;
+const analyticsScript = safeGaId
+  ? `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config',${JSON.stringify(safeGaId)},{anonymize_ip:true,allow_google_signals:false});const s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(${JSON.stringify(safeGaId)});document.head.appendChild(s);`
+  : undefined;
+const popular = tools.filter((tool) => tool.popular).slice(0, 5);
+const schema =
+  pageType === 'article'
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: h1 ?? title,
+        description,
+        mainEntityOfPage: canonical,
+        publisher: {
+          '@type': 'Organization',
+          name: 'compressimage.fun',
+          url: 'https://compressimage.fun/',
+        },
+      }
+    : {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': 'https://compressimage.fun/#website',
+            url: 'https://compressimage.fun/',
+            name: 'compressimage.fun',
+            description:
+              'Free image compression and conversion tools without signup or watermarks.',
+          },
+          ...(pageType === 'tool'
+            ? [
+                {
+                  '@type': 'WebApplication',
+                  name: h1 ?? title,
+                  url: canonical,
+                  applicationCategory: 'MultimediaApplication',
+                  operatingSystem: 'Any',
+                  browserRequirements: 'Requires a modern web browser',
+                  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+                  description,
+                },
+              ]
+            : []),
+        ],
+      };
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fffdf8" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta property="og:type" content={pageType === 'article' ? 'article' : 'website'} />
+    <meta property="og:site_name" content="compressimage.fun" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content="https://compressimage.fun/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="compressimage.fun: Compress images without the guesswork"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content="https://compressimage.fun/og.png" />
+    {verificationGoogle && <meta name="google-site-verification" content={verificationGoogle} />}
+    {verificationBing && <meta name="msvalidate.01" content={verificationBing} />}
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(schema)} />
+    {analyticsScript && <script is:inline set:html={analyticsScript} />}
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+      <div class="shell header-inner">
+        <a class="brand" href="/" aria-label="compressimage.fun home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>compressimage<span>.fun</span></span>
+        </a>
+        <nav aria-label="Main navigation">
+          <a href="/tools">All tools</a>
+          <a href="/compress-image-to-size">Exact size</a>
+          <a href="/guides">Guides</a>
+          <a href="/privacy">Privacy</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main"><slot /></main>
+    <footer class="site-footer">
+      <div class="shell footer-grid">
+        <div>
+          <a class="brand footer-brand" href="/">compressimage<span>.fun</span></a>
+          <p>Drop an image. Get exactly what you need.</p>
+          <p class="muted">No account, no watermark, no artificial daily limit.</p>
+        </div>
+        <div>
+          <h2>Popular tools</h2>
+          <ul>
+            {
+              popular.map((tool) => (
+                <li>
+                  <a href={toolPath(tool)}>{tool.h1}</a>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+        <div>
+          <h2>Project</h2>
+          <ul>
+            <li><a href="/privacy">Privacy</a></li>
+            <li><a href="/guides">Guides</a></li>
+            <li><a href="/tools">Tool index</a></li>
+            <li><a href="/llms.txt">llms.txt</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="shell footer-bottom">
+        <span>© {new Date().getFullYear()} compressimage.fun</span>
+        <span>Files auto-delete within four hours.</span>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,52 @@
+---
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import RelatedTools from '../../components/RelatedTools.astro';
+import { guides } from '../../data/guides';
+
+export function getStaticPaths() {
+  return guides.map((guide) => ({ params: { slug: guide.slug }, props: { guide } }));
+}
+const { guide } = Astro.props;
+---
+
+<SiteLayout
+  title={`${guide.title} | compressimage.fun`}
+  description={guide.description}
+  canonicalPath={`/guides/${guide.slug}`}
+  pageType="article"
+  h1={guide.title}
+>
+  <Breadcrumbs items={[{ label: 'Guides', href: '/guides' }, { label: guide.title }]} />
+  <header class="hero compact">
+    <div class="shell">
+      <div class="eyebrow">{guide.readMinutes} minute guide</div><h1>{guide.title}</h1><p
+        class="lead"
+      >
+        {guide.description}
+      </p>
+    </div>
+  </header>
+  <article class="article shell">
+    <div class="article-body">
+      <p class="article-summary">{guide.summary}</p>{
+        guide.sections.map((section) => (
+          <section>
+            <h2>{section.heading}</h2>
+            {section.paragraphs.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+            {section.bullets && (
+              <ul>
+                {section.bullets.map((bullet) => (
+                  <li>{bullet}</li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ))
+      }
+    </div>
+  </article>
+  <RelatedTools ids={guide.relatedTools} />
+</SiteLayout>

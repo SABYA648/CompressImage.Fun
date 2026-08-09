@@ -1,0 +1,36 @@
+---
+import SiteLayout from '../../layouts/SiteLayout.astro';
+import { guides } from '../../data/guides';
+---
+
+<SiteLayout
+  title="Image Compression & Format Guides | compressimage.fun"
+  description="Practical guides to image compression, exact file sizes, formats, metadata, dimensions, and Base64."
+  canonicalPath="/guides"
+>
+  <header class="hero compact">
+    <div class="shell">
+      <div class="eyebrow">Practical image notes</div><h1>Understand the file, fix it faster</h1><p
+        class="lead"
+      >
+        Clear explanations grounded in how the tools actually process images.
+      </p>
+    </div>
+  </header>
+  <section class="article-list shell">
+    <div class="guide-grid">
+      {
+        guides.map((guide) => (
+          <a class="guide-card" href={`/guides/${guide.slug}`}>
+            <>
+              <small>{guide.readMinutes} minute read</small>
+              <h2>{guide.title}</h2>
+              <p>{guide.description}</p>
+              <strong>Read guide →</strong>
+            </>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+</SiteLayout>

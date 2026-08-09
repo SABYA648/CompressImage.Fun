@@ -1,0 +1,16 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import ToolPage from '../components/ToolPage.astro';
+import { toolById } from '../data/tools';
+const tool = toolById.get('image-compressor')!;
+---
+
+<SiteLayout
+  title={tool.title}
+  description={tool.description}
+  canonicalPath="/"
+  pageType="tool"
+  h1={tool.h1}
+>
+  <ToolPage tool={tool} home />
+</SiteLayout>

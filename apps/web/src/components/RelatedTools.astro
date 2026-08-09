@@ -1,0 +1,26 @@
+---
+import { toolById, toolPath } from '../data/tools';
+const { ids } = Astro.props as { ids: string[] };
+const related = ids.map((id) => toolById.get(id)).filter(Boolean);
+---
+
+<section class="related shell" aria-labelledby="related-title">
+  <div class="eyebrow">Keep going</div>
+  <h2 id="related-title">Useful next tools</h2>
+  <div class="related-grid">
+    {
+      related.map(
+        (tool) =>
+          tool && (
+            <a class="related-link" href={toolPath(tool)}>
+              <>
+                <span>{tool.category}</span>
+                <strong>{tool.h1}</strong>
+                <b aria-hidden="true">→</b>
+              </>
+            </a>
+          ),
+      )
+    }
+  </div>
+</section>

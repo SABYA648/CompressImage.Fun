@@ -1,0 +1,80 @@
+services:
+  processor:
+    build:
+      context: .
+      target: processor
+    environment:
+      FILE_TTL_SECONDS: ${FILE_TTL_SECONDS:-14400}
+      TEMP_STORAGE_DIR: /data/jobs
+      PROCESS_CONCURRENCY: ${PROCESS_CONCURRENCY:-2}
+      SHARP_CONCURRENCY: ${SHARP_CONCURRENCY:-2}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-104857600}
+      MAX_BATCH_BYTES: ${MAX_BATCH_BYTES:-524288000}
+      MAX_BATCH_FILES: ${MAX_BATCH_FILES:-50}
+      MAX_IMAGE_PIXELS: ${MAX_IMAGE_PIXELS:-100000000}
+      MAX_ANIMATION_FRAMES: ${MAX_ANIMATION_FRAMES:-500}
+      PROCESS_TIMEOUT_MS: ${PROCESS_TIMEOUT_MS:-60000}
+      MIN_FREE_DISK_BYTES: ${MIN_FREE_DISK_BYTES:-1073741824}
+    volumes:
+      - jobs:/data/jobs
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: '3.5'
+          memory: 12G
+    restart: unless-stopped
+    networks:
+      - internal
+
+  web:
+    build:
+      context: .
+      target: web
+    depends_on:
+      processor:
+        condition: service_healthy
+    ports:
+      - '${PUBLIC_PORT:-8080}:8080'
+    read_only: true
+    tmpfs:
+      # Runtime tmpfs mounts hide the image-layer ownership, so grant the
+      # unprivileged Nginx worker access without making the root filesystem writable.
+      - /var/cache/nginx:size=32m,mode=1777
+      - /var/run:size=4m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    networks:
+      - internal
+      - edge
+
+  e2e:
+    profiles: [qa]
+    build:
+      context: .
+      target: e2e
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      BASE_URL: http://web:8080
+    ipc: host
+    networks:
+      - internal
+
+volumes:
+  jobs:
+
+networks:
+  internal:
+    internal: true
+  edge:

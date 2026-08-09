@@ -1,0 +1,87 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import { tools, toolPath } from '../data/tools';
+const categories = [
+  'Compress',
+  'Resize & Prepare',
+  'Convert',
+  'Developer',
+  'Inspect & Privacy',
+  'Create',
+];
+---
+
+<SiteLayout
+  title="All Image Tools | compressimage.fun"
+  description="Search free image compression, exact-size, resize, crop, convert, Base64, metadata, favicon, and watermark tools."
+  canonicalPath="/tools"
+>
+  <header class="hero compact">
+    <div class="shell">
+      <div class="eyebrow">The whole toolkit</div><h1>One place for image chores</h1><p
+        class="lead"
+      >
+        Compress, resize, convert, inspect, and create. No login maze between you and the file.
+      </p>
+    </div>
+  </header>
+  <section class="tool-index shell">
+    <div class="tool-search">
+      <label class="visually-hidden" for="tool-query">Search tools</label><input
+        id="tool-query"
+        type="search"
+        placeholder="Try “50kb”, “heic”, or “base64”"
+        autocomplete="off"
+      />
+    </div>
+    <p id="search-status" class="muted" aria-live="polite"></p>
+    {
+      categories.map((category) => (
+        <section class="category" data-category>
+          <>
+            <h2>{category}</h2>
+            <div class="tool-grid">
+              {tools
+                .filter((tool) => tool.category === category)
+                .map((tool) => (
+                  <a
+                    class="tool-card"
+                    href={toolPath(tool)}
+                    data-search={`${tool.h1} ${tool.description} ${tool.id} ${(tool.aliases ?? []).join(' ')}`.toLowerCase()}
+                  >
+                    <small>{tool.category}</small>
+                    <h3>{tool.h1}</h3>
+                    <p>{tool.description}</p>
+                    <span>Open tool →</span>
+                  </a>
+                ))}
+            </div>
+          </>
+        </section>
+      ))
+    }
+  </section>
+  <script>
+    const input = document.querySelector<HTMLInputElement>('#tool-query');
+    const cards = [...document.querySelectorAll<HTMLElement>('[data-search]')];
+    const status = document.querySelector<HTMLElement>('#search-status');
+    input?.addEventListener('input', () => {
+      const query = input.value.trim().toLowerCase();
+      let visible = 0;
+      cards.forEach((card) => {
+        const match = !query || card.dataset.search?.includes(query);
+        card.hidden = !match;
+        if (match) visible += 1;
+      });
+      document.querySelectorAll<HTMLElement>('[data-category]').forEach((section) => {
+        section.hidden = ![...section.querySelectorAll<HTMLElement>('[data-search]')].some(
+          (card) => !card.hidden,
+        );
+      });
+      if (status)
+        status.textContent = query
+          ? `${visible} matching ${visible === 1 ? 'tool' : 'tools'}`
+          : `${cards.length} working tools`;
+    });
+  </script>
+</SiteLayout>

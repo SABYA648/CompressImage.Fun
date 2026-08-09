@@ -1,0 +1,68 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+---
+
+<SiteLayout
+  title="Privacy & Temporary File Processing | compressimage.fun"
+  description="Plain-language details about server processing, four-hour deletion, Delete now, browser-only Base64 tools, logs, and analytics."
+  canonicalPath="/privacy"
+>
+  <header class="hero compact">
+    <div class="shell">
+      <div class="eyebrow">Plain-language privacy</div><h1>Your files are temporary</h1><p
+        class="lead"
+      >
+        Server tools need the image to do the work. Browser-only tools do not upload it. Here is the
+        exact boundary.
+      </p>
+    </div>
+  </header>
+  <article class="article shell">
+    <div class="article-body">
+      <p class="article-summary">
+        Files processed on compressimage.fun servers are automatically deleted within four hours.
+        You can delete a completed job immediately.
+      </p>
+      <section>
+        <h2>Server tools</h2><p>
+          Compression, resizing, cropping, format conversion, metadata tools, watermarks, and
+          favicon generation upload images to the same-origin processing API. Each temporary job
+          uses a cryptographically random ID and a separate high-entropy access token. Files are
+          stored under random internal names, not your filename.
+        </p><p>
+          The source, outputs, small private previews, and safe job metadata live in an isolated
+          processor volume. A cleanup task runs at startup and periodically. Delete now removes the
+          complete job directory immediately.
+        </p>
+      </section>
+      <section>
+        <h2>Browser tools</h2><p>
+          Image to Base64, Base64 to Image, Base64 Image Viewer, and Image to Data URI run in
+          browser memory. Their file or pasted value is not sent to the processing API. The tools
+          also set input limits to avoid freezing your tab.
+        </p>
+      </section>
+      <section>
+        <h2>Logs</h2><p>
+          Operational logs may contain a request ID, tool ID, format, coarse size bucket, duration,
+          and a controlled error category. They do not intentionally contain image bytes, Base64
+          data, GPS values, access tokens, result URLs, or full original filenames.
+        </p>
+      </section>
+      <section>
+        <h2>Analytics</h2><p>
+          Analytics is off when no measurement ID is configured. If enabled later, the event layer
+          sends only controlled categories such as tool ID, format, file-count bucket, and
+          processing result. Filenames, image contents, EXIF, job IDs, access tokens, and free-form
+          errors are excluded.
+        </p>
+      </section>
+      <section>
+        <h2>What metadata removal cannot do</h2><p>
+          Removing EXIF and GPS fields does not hide information visible in the pixels. Faces,
+          signs, reflections, and document text may still reveal private details.
+        </p>
+      </section>
+    </div>
+  </article>
+</SiteLayout>

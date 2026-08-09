@@ -1,0 +1,22 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import ToolPage from '../components/ToolPage.astro';
+import { tools } from '../data/tools';
+
+export function getStaticPaths() {
+  return tools
+    .filter((tool) => tool.slug)
+    .map((tool) => ({ params: { slug: tool.slug }, props: { tool } }));
+}
+const { tool } = Astro.props;
+---
+
+<SiteLayout
+  title={tool.title}
+  description={tool.description}
+  canonicalPath={`/${tool.slug}`}
+  pageType="tool"
+  h1={tool.h1}
+>
+  <ToolPage tool={tool} />
+</SiteLayout>

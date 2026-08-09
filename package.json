@@ -1,0 +1,50 @@
+{
+  "name": "compressimage-fun",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace @compressimage/web run dev",
+    "dev:processor": "npm --workspace @compressimage/processor run dev",
+    "build": "npm run build:processor && npm run build:web",
+    "build:web": "npm --workspace @compressimage/web run build",
+    "build:processor": "npm --workspace @compressimage/processor run build",
+    "typecheck": "npm run typecheck:processor && npm run typecheck:web",
+    "typecheck:web": "npm --workspace @compressimage/web run typecheck",
+    "typecheck:processor": "npm --workspace @compressimage/processor run typecheck",
+    "lint": "eslint apps scripts tests --max-warnings=0",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "content:lint": "node scripts/content-lint.mjs",
+    "test": "npm --workspace @compressimage/processor run test",
+    "test:unit": "npm --workspace @compressimage/processor run test",
+    "test:e2e": "playwright test",
+    "test:seo": "node scripts/seo-crawl.mjs",
+    "test:a11y": "playwright test tests/e2e/accessibility.spec.ts",
+    "benchmark:compression": "node scripts/benchmark-compression.mjs",
+    "benchmark:exact": "node scripts/benchmark-exact-size.mjs",
+    "test:load": "node scripts/load-test.mjs",
+    "test:lighthouse": "node scripts/lighthouse.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.50.0",
+    "chrome-launcher": "^1.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^16.0.0",
+    "lighthouse": "^13.0.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "overrides": {
+    "sharp": "0.35.3"
+  }
+}

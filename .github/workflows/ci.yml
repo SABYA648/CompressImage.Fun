@@ -1,0 +1,22 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker validation target
+        run: docker build --target build -t compressimage-build:${{ github.sha }} .
+      - name: Run quality gate in the built dependency environment
+        run: |
+          docker run --rm compressimage-build:${{ github.sha }} npm run typecheck
+          docker run --rm compressimage-build:${{ github.sha }} npm run lint
+          docker run --rm compressimage-build:${{ github.sha }} npm run format:check
+          docker run --rm compressimage-build:${{ github.sha }} npm run content:lint
+          docker run --rm compressimage-build:${{ github.sha }} npm test
+      - name: Build production images
+        run: docker compose build
