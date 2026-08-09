@@ -7,6 +7,12 @@ COPY apps/processor/package.json apps/processor/package.json
 RUN npm ci
 
 FROM dependencies AS build
+ARG PUBLIC_GA_MEASUREMENT_ID=
+ARG PUBLIC_GOOGLE_SITE_VERIFICATION=
+ARG PUBLIC_BING_SITE_VERIFICATION=
+ENV PUBLIC_GA_MEASUREMENT_ID=$PUBLIC_GA_MEASUREMENT_ID \
+    PUBLIC_GOOGLE_SITE_VERIFICATION=$PUBLIC_GOOGLE_SITE_VERIFICATION \
+    PUBLIC_BING_SITE_VERIFICATION=$PUBLIC_BING_SITE_VERIFICATION
 COPY tsconfig.base.json eslint.config.mjs .prettierrc.json .prettierignore ./
 COPY apps ./apps
 COPY scripts ./scripts

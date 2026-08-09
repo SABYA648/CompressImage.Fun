@@ -20,11 +20,8 @@ const {
 const canonical = new URL(canonicalPath || '/', 'https://compressimage.fun').toString();
 const verificationGoogle = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION;
 const verificationBing = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
-const gaId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID;
-const safeGaId = /^G-[A-Z0-9]+$/.test(gaId ?? '') ? gaId : undefined;
-const analyticsScript = safeGaId
-  ? `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config',${JSON.stringify(safeGaId)},{anonymize_ip:true,allow_google_signals:false});const s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(${JSON.stringify(safeGaId)});document.head.appendChild(s);`
-  : undefined;
+const gaId = String(import.meta.env.PUBLIC_GA_MEASUREMENT_ID ?? '').trim();
+const safeGaId = /^G-[A-Z0-9]+$/i.test(gaId) ? gaId.toUpperCase() : undefined;
 const popular = tools.filter((tool) => tool.popular).slice(0, 5);
 const schema =
   pageType === 'article'
@@ -101,7 +98,21 @@ const schema =
     {verificationGoogle && <meta name="google-site-verification" content={verificationGoogle} />}
     {verificationBing && <meta name="msvalidate.01" content={verificationBing} />}
     <script is:inline type="application/ld+json" set:html={JSON.stringify(schema)} />
-    {analyticsScript && <script is:inline set:html={analyticsScript} />}
+    {
+      safeGaId && (
+        <>
+          <script async src={`https://www.googletagmanager.com/gtag/js?id=${safeGaId}`} />
+          <script is:inline define:vars={{ gaId: safeGaId }}>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+              dataLayer.push(arguments);
+            }
+            gtag('js', new Date());
+            gtag('config', gaId, { anonymize_ip: true, allow_google_signals: false });
+          </script>
+        </>
+      )
+    }
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>

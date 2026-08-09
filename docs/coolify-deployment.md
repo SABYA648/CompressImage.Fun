@@ -122,7 +122,12 @@ Leaving it empty is supported: no analytics request is made and no console error
 appears.
 
 The three `PUBLIC_` values are read when the static site is built, so changing
-them requires a rebuild, not just a restart.
+them requires a rebuild, not just a restart. Set them in Coolify's environment
+before deploying so Docker Compose passes them as image build arguments.
+
+`PUBLIC_GA_MEASUREMENT_ID` must be present at build time. A runtime-only value
+on the `web` container will not enable analytics because the Astro output is
+already baked into the image.
 
 On the intended 4 vCPU and 16 GB host, keep `PROCESS_CONCURRENCY` and
 `SHARP_CONCURRENCY` at 2. Two jobs times two libvips threads matches the core
