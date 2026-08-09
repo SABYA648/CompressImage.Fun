@@ -303,11 +303,102 @@ rather than trusting the file extension.
 - Firefox and WebKit E2E. Only Chromium was available.
 - Real device testing. Mobile evidence is Chromium emulation at real widths.
 
+## Final Coolify release pass (2026-08-09)
+
+Ran on branch `cursor/final-coolify-release-0b86` after the Docker Hub egress
+block that stopped earlier passes was no longer present. Every gate below ran
+against the real production Compose images (`workspace-processor`,
+`workspace-web`), not a host substitute.
+
+### Compose contract changes proven this pass
+
+- Production `docker-compose.yml` no longer publishes `0.0.0.0:8080`. `web`
+  uses `expose: ["8080"]` so Coolify can route to container port 8080 without
+  binding the VPS host port.
+- `docker-compose.local.yml` publishes `127.0.0.1:${PUBLIC_PORT:-8080}:8080`
+  for local QA only.
+- `processor` still has no `ports`, no domain, and sits on `internal: true`.
+- `e2e` remains behind `profiles: [qa]` and did not start under
+  `docker compose up -d`.
+
+### HEIC packaging correction
+
+`libheif-plugin-libde265` does **not** exist on Debian bookworm
+(`node:24-bookworm-slim`). Bookworm's `libheif-examples` pulls `libheif1`, which
+links `libde265-0` directly. Installing the Ubuntu plugin package name made
+`docker compose build` fail with `Unable to locate package`. Dockerfile now
+installs `libheif-examples` only. Inside the built processor:
+
+```
+heif-convert --list-decoders
+HEIC decoders:
+- libde265 = libde265 HEVC decoder, version 1.0.11
+```
+
+`heicDecoderAvailable()` now probes `--list-decoders` for `libde265|hevc`
+instead of `--version` (not portable across libheif 1.15).
+
+### Gates (this pass)
+
+| Gate | Command / method | Result |
+| ---- | ---------------- | ------ |
+| Docker build | `docker compose build --pull` | PASS: `processor` and `web` built |
+| Compose up | `docker compose up -d` then local overlay for QA | PASS: processor healthy, web healthy, e2e absent |
+| Health | `GET http://127.0.0.1:8080/health` and `/ready` | PASS: `{"status":"ok"}`, ready with queueDepth 0 |
+| HEIC in container | HEIC→JPG, HEIC→WebP, HEIC exact 100 KB via `/api/jobs` | PASS: 1400×900 decode, outputs valid, exact ≤ 100 KB (101732 B at 952×612) |
+| AVIF | JPEG→AVIF, preserve-format, exact 50 KB | PASS: av1 compression, no JPEG fallback, 48016 B in 17.5 s |
+| Core smoke | JPEG, exact 50 KB, PNG, WebP, resize, batch, metadata remove, download | PASS |
+| Persistence | process → restart processor → download | PASS |
+| Delete now | DELETE → 404 job/download → directory gone | PASS: 204 then gone |
+| TTL | `FILE_TTL_SECONDS=60`, wait 65 s, restart cleanup | PASS: job 404, download 404, directory gone; restored to 14400 |
+| Security headers | live Nginx HTML / CSS / `/api/` | PASS: nosniff, DENY, CSP, API `private, no-store` + `noindex` |
+| Processor isolation | `docker compose port processor 3000` | PASS: no published host port |
+| Browser-local | Playwright Base64 encode/decode/viewer, color picker, Image to PDF | PASS: zero `/api/` requests |
+| Compact Chromium | `tests/e2e/release-smoke.spec.ts` (6) | PASS: homepage, 50 KB, HEIC, AVIF, Base64 privacy, 390 px |
+| SEO runtime | `/`, robots, sitemap-index, llms, representative pages | PASS: all 200 |
+| Lighthouse | `npm run test:lighthouse` vs Docker web | PASS: all six routes Performance/A11y/BP/SEO = 100 |
+
+### Lighthouse (Docker-hosted)
+
+| Route | Perf | A11y | BP | SEO | LCP | TBT | CLS |
+| ----- | ---- | ---- | -- | --- | --- | --- | --- |
+| / | 100 | 100 | 100 | 100 | 1652 ms | 0 | 0 |
+| /compress-image-to-50kb | 100 | 100 | 100 | 100 | 1653 ms | 0 | 0 |
+| /resize-image | 100 | 100 | 100 | 100 | 1502 ms | 0 | 0 |
+| /image-to-base64 | 100 | 100 | 100 | 100 | 1352 ms | 0 | 0 |
+| /guides/how-to-compress-image-to-exact-file-size | 100 | 100 | 100 | 100 | 901 ms | 0 | 0 |
+| /tools | 100 | 100 | 100 | 100 | 1051 ms | 0 | 0 |
+
+### Coolify settings proven by this pass
+
+```
+Build Pack: Docker Compose
+Base Directory: /
+Compose Location: /docker-compose.yml
+Processor domain: (blank)
+Web domain: https://compressimage.fun:8080
+E2E domain: (blank)
+Health: web /health
+Volume: jobs → processor:/data/jobs
+QA profile: disabled
+Public URL: https://compressimage.fun
+```
+
+`:8080` in the Coolify domain field is the internal container target port, not
+part of the public URL.
+
+### Verdict
+
+**100/100 READY FOR COOLIFY DEPLOYMENT**
+
 ## Commits
 
 - `aa6e386` — AVIF/HEIC pipeline fixes, header hardening, native verification
   (`claude/compressimage-final-hardening-7i1ooe`), described throughout this
   document except the "Docker verification pass" section.
-- Docker verification pass — HEIC decoder packaging fix and this document's
-  Docker-related updates, on `claude/compressimage-docker-release-ycp1xz`
-  (fast-forwarded from `aa6e386`).
+- Docker verification pass — HEIC decoder packaging investigation on
+  `claude/compressimage-docker-release-ycp1xz` (fast-forwarded from `aa6e386`);
+  earlier incorrectly assumed Ubuntu plugin package names for bookworm.
+- Final Coolify release pass — Compose host-port removal, bookworm HEIC package
+  fix, decoder probe fix, Coolify docs, and full Docker gate evidence on
+  `cursor/final-coolify-release-0b86`.

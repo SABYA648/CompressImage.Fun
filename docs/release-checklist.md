@@ -26,21 +26,24 @@ Measurements and commands behind every checked line are in `docs/test-evidence.m
 - [x] Eight-job mixed concurrency probe
 - [x] Lighthouse on six routes: performance, accessibility, and SEO all 100
 - [x] Repository sweep for developer paths, placeholders, and stray files
+- [x] Production Docker image build (`docker compose build --pull`)
+- [x] Compose startup: `processor` and `web` healthy; `e2e` not started
+- [x] Live Nginx security headers on HTML, static assets, and `/api/`
+- [x] HEIC decoder verified inside the real processor container
+- [x] Production Compose publishes no host port; local overlay is localhost-only
 
-## Blocked in this environment
+## Remaining non-blockers
 
-- [ ] Docker image build, Compose startup, and live Nginx headers. The network policy
-      refuses Docker Hub, so no base image could be pulled. The `Dockerfile` and
-      `docker/nginx.conf` changes are reviewed but not executed. Build once on the
-      deployment host before serving traffic.
-- [ ] Firefox and WebKit E2E. Only Chromium was available.
+- [ ] Firefox and WebKit E2E. Only Chromium was exercised in this environment.
 
 ## Owner actions after deploy
 
-- [ ] Create the Coolify application from `docker-compose.yml`
-- [ ] Point `compressimage.fun` at the `web` service on port 8080
-- [ ] Attach the persistent volume at `/data/jobs` on the processor
-- [ ] Set the health check path to `/health`
+- [ ] Create the Coolify application from `docker-compose.yml` (Build Pack: Docker Compose, Base Directory `/`, Compose Location `/docker-compose.yml`)
+- [ ] Leave `processor` and `e2e` domains blank; set `web` domain to `https://compressimage.fun:8080` (internal target port)
+- [ ] Confirm the public URL remains `https://compressimage.fun` (no `:8080` in the browser)
+- [ ] Confirm Compose volume `jobs` → `processor:/data/jobs`
+- [ ] Set the health check path to `/health` on `web`
+- [ ] Leave the QA profile disabled
 - [ ] Deploy and confirm both services report healthy
 - [ ] Open the homepage and compress one real phone photo
 - [ ] Upload one real iPhone HEIC and confirm it converts

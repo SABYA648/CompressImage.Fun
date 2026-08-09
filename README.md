@@ -59,10 +59,12 @@ Local Docker is authoritative. Do not use host Node.js or native codecs as relea
 
 ```sh
 docker build --target build -t compressimage-build:local .
-docker compose up --build -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
 ```
 
-The local site is then available at `http://localhost:8080`. Dependencies, checks, and builds run in containers:
+Production Compose does not publish a host port; Coolify routes to container
+`8080`. The local overlay binds `http://127.0.0.1:8080` only. Dependencies,
+checks, and builds run in containers:
 
 ```sh
 docker compose run --rm processor node --version
