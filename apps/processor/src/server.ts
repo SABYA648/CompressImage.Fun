@@ -138,7 +138,12 @@ app.post('/api/jobs', async (request, reply) => {
       }
       if (detected.mime === 'image/svg+xml') await assertSafeSvg(path);
 
-      const metadata = await engine.inspect(path);
+      // HEIC pixels are swapped for PNG in place when a decoder is available, but the
+      // file keeps its HEIC identity so "keep original format" still resolves to JPEG
+      // and savings stay measured against the bytes the visitor actually uploaded.
+      const decodedHeic = await engine.transcodeHeicSource(path);
+      const inspected = await engine.inspect(path);
+      const metadata = decodedHeic ? { ...inspected, format: 'heif' } : inspected;
       const originalName = store.safeDownloadName(
         part.filename || `image.${detected.ext}`,
         `image.${detected.ext}`,

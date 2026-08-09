@@ -51,7 +51,10 @@ export const encode = (
         nearLossless: quality >= 95,
       });
     case 'avif':
-      return prepared.avif({ quality, effort: 4, chromaSubsampling: '4:4:4' });
+      // Measured on the benchmark fixtures: effort 4 is pathological on noisy photos,
+      // producing a larger file than effort 3 while taking roughly 4.5x as long. Effort
+      // 3 is the practical sweet spot and keeps exact-size AVIF inside the job timeout.
+      return prepared.avif({ quality, effort: 3, chromaSubsampling: '4:4:4' });
   }
 };
 

@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
+import { promisify } from 'node:util';
 import exifr from 'exifr';
 import sharp from 'sharp';
 import { ZipFile } from 'yazl';
@@ -30,6 +32,23 @@ const safeExifKeys = [
   'GPSLongitude',
 ] as const;
 
+const execFileAsync = promisify(execFile);
+
+/**
+ * The bundled libvips decodes AV1 but ships no HEVC decoder, so HEIC pixel data is
+ * unreadable through sharp alone. libheif's heif-convert handles it when the image
+ * carries the tool, so probe once and treat it as an optional capability: without it
+ * HEIC uploads still fail cleanly instead of breaking the rest of the service.
+ */
+let heicDecoderProbe: Promise<boolean> | undefined;
+const heicDecoderAvailable = (): Promise<boolean> => {
+  heicDecoderProbe ??= execFileAsync('heif-convert', ['--version'], { timeout: 5000 }).then(
+    () => true,
+    () => false,
+  );
+  return heicDecoderProbe;
+};
+
 const xmlEscape = (value: string): string =>
   value.replace(
     /[<>&"']/g,
@@ -44,6 +63,41 @@ export class ImageEngine {
     sharp.cache({ memory: 256, files: 20, items: 100 });
   }
 
+  /**
+   * Replace a HEVC-coded HEIC upload with lossless PNG pixels in place, so every
+   * downstream step works on something sharp can actually read. Returns false when
+   * the file is not HEIC or no decoder is installed, leaving the file untouched.
+   */
+  async transcodeHeicSource(path: string): Promise<boolean> {
+    let probe;
+    try {
+      probe = await inputSharp(path, config.MAX_IMAGE_PIXELS).metadata();
+    } catch {
+      return false;
+    }
+    if (probe.format !== 'heif' || probe.compression !== 'hevc') return false;
+    if (!(await heicDecoderAvailable())) return false;
+
+    const pixels = (probe.width ?? 0) * (probe.height ?? 0);
+    if (!pixels || pixels > config.MAX_IMAGE_PIXELS) return false;
+
+    const converted = `${path}.decoded.png`;
+    try {
+      await execFileAsync('heif-convert', ['--quality', '100', path, converted], {
+        timeout: config.PROCESS_TIMEOUT_MS,
+        maxBuffer: 1024 * 1024,
+      });
+      // Confirm the decoder produced something readable before trusting it.
+      const check = await inputSharp(converted, config.MAX_IMAGE_PIXELS).metadata();
+      if (check.format !== 'png' || !check.width || !check.height) throw new Error('bad decode');
+      await rename(converted, path);
+      return true;
+    } catch {
+      await rm(converted, { force: true }).catch(() => undefined);
+      return false;
+    }
+  }
+
   async inspect(path: string): Promise<SafeMetadata> {
     const metadata = await inputSharp(path, config.MAX_IMAGE_PIXELS).metadata();
     if (!metadata.format || !metadata.width || !metadata.height) {
@@ -54,6 +108,16 @@ export class ImageEngine {
       throw new AppError(
         'TOO_MANY_PIXELS',
         `This image exceeds the ${Math.round(config.MAX_IMAGE_PIXELS / 1_000_000)} megapixel safety limit.`,
+      );
+    }
+    // The prebuilt libvips binary parses the HEIF container but ships no HEVC
+    // decoder, so HEIC pixel data cannot be read. Fail here with something the
+    // visitor can act on rather than deep inside the encoder with "bad seek".
+    if (metadata.format === 'heif' && metadata.compression === 'hevc') {
+      throw new AppError(
+        'HEIC_DECODE_UNAVAILABLE',
+        'HEIC photos saved in the HEVC format cannot be converted here yet. On iPhone, open Settings, Camera, Formats and choose Most Compatible to save new photos as JPG.',
+        415,
       );
     }
     if ((metadata.pages ?? 1) > config.MAX_ANIMATION_FRAMES) {
@@ -82,7 +146,12 @@ export class ImageEngine {
     }
 
     return {
-      format: metadata.format,
+      // libvips reports every HEIF-container image as "heif". AVIF and HEIC share
+      // that container but behave differently here: AVIF round-trips, HEIC can only
+      // be decoded. Splitting them on the codec keeps "keep original format" honest
+      // for AVIF and lets output validation match the name the encoder used.
+      format:
+        metadata.format === 'heif' && metadata.compression === 'av1' ? 'avif' : metadata.format,
       width: metadata.width,
       height: metadata.height,
       ...(metadata.space ? { space: metadata.space } : {}),

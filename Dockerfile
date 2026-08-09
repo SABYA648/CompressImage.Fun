@@ -31,6 +31,11 @@ FROM node:24-bookworm-slim AS processor
 ENV NODE_ENV=production \
     VIPS_BLOCK_UNTRUSTED=true \
     MALLOC_ARENA_MAX=2
+# The bundled libvips decodes AV1 but not HEVC, so HEIC needs libheif's own
+# converter. Without this package HEIC uploads fail with a clear message instead.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libheif-examples \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/apps/processor/dist ./apps/processor/dist

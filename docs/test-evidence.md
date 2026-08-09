@@ -1,34 +1,161 @@
 # Test evidence
 
-Evidence below was produced on 2026-08-09 through local Docker only. A skipped or
-failed row is not evidence of success. The owner stopped further resource-intensive
-testing after Docker Desktop exhausted the host filesystem while unpacking the
-pinned Playwright image.
+Evidence below was produced on 2026-08-09 in the release-hardening environment, on
+the commit recorded at the bottom of this page. Every row states what was actually
+run and where. A row marked BLOCKED is not evidence of success.
 
-| Gate | Command | Actual result |
-| --- | --- | --- |
-| Source state | `git rev-parse HEAD`; `git status --short` | Base revision `71ff7de54e7706947e4d67624aa88e508314fbbb`; implementation is uncommitted and untracked, so no immutable release revision exists. |
-| Dependency install | `docker build --target build -t compressimage-build:local .` | PASS: clean `npm ci`, 678 packages audited, 0 vulnerabilities. npm printed a non-failing allow-scripts review notice for esbuild. |
-| Audit | `docker run --rm compressimage-build:local npm audit --omit=dev` | PASS: 0 vulnerabilities. |
-| Type check | `docker run --rm compressimage-build:local npm run typecheck` | PASS: processor TypeScript and Astro check; 0 errors, warnings, or hints. |
-| Lint | `docker run --rm compressimage-build:local npm run lint` | PASS. |
-| Format | `docker run --rm compressimage-build:local npm run format:check` | PASS. |
-| Content | `docker run --rm compressimage-build:local npm run content:lint` | PASS: 22 source files plus generated metadata checks. |
-| Unit/security | `docker run --rm compressimage-build:local npm test` | PASS: 4 files, 7 tests, including token auth, TTL store cleanup, exact-size bounds, form-photo preparation, and favicon outputs. |
-| Static build | Same build command | PASS: 52 static pages. Build image manifest list `sha256:71f95a424dc9af9bb95564902319c561b27551db6e498614a9bcb3e78665e5f3`. |
-| Production images | `docker compose build` | PASS: Nginx web and Node processor images built; manifests `sha256:5c528daf...` and `sha256:e772d8c0...`. |
-| Compose health/routes | `PUBLIC_PORT=18080 docker compose up -d`; curl `/health`, `/ready`, `/`, `/passport-photo-resizer`, missing route | PASS after fixing tmpfs permissions: services healthy, queue ready, public pages 200, missing page 404. Port 18080 was used because owner container `teleprompter-e2e` already owns 8080. |
-| E2E/accessibility | `PUBLIC_PORT=18080 docker compose --profile qa build e2e` | NOT RUN. The pinned Playwright image downloaded and built, but Docker Desktop failed unpacking the final layer with an overlayfs I/O error after the host filesystem reached 100%. Owner requested stopping resource-intensive testing. |
-| SEO crawl | QA container | NOT RUN after owner stop. |
-| Benchmarks/load | Processor/QA container | NOT RUN after owner stop. |
-| TTL integration | Local volume lifecycle test | NOT RUN after owner stop; store-level TTL unit coverage passed. |
-| Lighthouse | Local production Compose | NOT RUN after owner stop. |
-| Final post-fix gate | Docker static gate | NOT RERUN after the final Compose-only tmpfs mode edit because the owner stopped further testing. |
+## Environment
 
-Resource recovery: only the ignored, regenerable repository `node_modules`
-directory was removed. No source file, owner Docker image, or Docker-wide cache was
-deleted. Host free space recovered from 117 MB to 4.6 GB.
+| Property        | Value                                                                                                                                                                                              |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Host            | Linux 6.18.5, x86-64, 4 vCPU visible to the runtime, 30 GB free disk                                                                                                                               |
+| Node            | v22.22.2 for tooling, `node:24-bookworm-slim` in the production image                                                                                                                              |
+| sharp / libvips | sharp 0.35.3, libvips 8.18.3, libheif 1.23.1                                                                                                                                                       |
+| Docker          | Daemon available, but Docker Hub blob downloads are refused by the network egress policy (`403` on `production.cloudfront.docker.com`). No base image could be pulled, so no image could be built. |
+| Substitute edge | Docker-based Nginx could not run, so the built site and the processor were served on one origin by a local reverse proxy reproducing the routes and headers in `docker/nginx.conf`.                |
+| Browser         | Chromium 1194 already present at `/opt/pw-browsers`, reused instead of downloading Playwright's pinned build.                                                                                      |
 
-Coolify verdict: `NOT READY FOR COOLIFY DEPLOYMENT`. The browser, SEO, performance,
-load, and TTL integration gates remain unrun, and the source state is not an
-immutable revision.
+Because images could not be built, every gate that the previous pass ran "through
+Docker" was re-run against the same compiled artefacts running natively. The
+processor code, the sharp binary, and the static build are identical to what the
+image would contain. What is genuinely unverified is the image assembly itself, the
+Nginx runtime, and the Compose health wiring; those are listed as BLOCKED.
+
+## Gates
+
+| Gate                          | Command                                                                                                        | Actual result                                                                                                                                                                                    |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Source state                  | `git status --short`                                                                                           | PASS: 9 intentional modifications, no stray untracked files. Artefacts and reports are ignored.                                                                                                  |
+| Install                       | `npm ci`                                                                                                       | PASS: exit 0.                                                                                                                                                                                    |
+| Type check                    | `npm run typecheck`                                                                                            | PASS: processor `tsc` plus `astro check`, 0 errors, 0 warnings, 0 hints across 24 files.                                                                                                         |
+| Lint                          | `npm run lint`                                                                                                 | PASS: `eslint --max-warnings=0`.                                                                                                                                                                 |
+| Format                        | `npm run format:check`                                                                                         | PASS after reformatting `docs/test-evidence.md`.                                                                                                                                                 |
+| Content lint                  | `npm run content:lint`                                                                                         | PASS: 22 source files.                                                                                                                                                                           |
+| Unit / security / engine      | `npm test`                                                                                                     | PASS: 4 files, 9 tests, up from 7. Two new tests cover AVIF output validation and AVIF source identification.                                                                                    |
+| Static build                  | `npm run build`                                                                                                | PASS: 52 pages.                                                                                                                                                                                  |
+| Health and readiness          | `GET /health`, `GET /ready` through the edge proxy                                                             | PASS: `{"status":"ok"}` and `{"status":"ready","queueDepth":0,"active":0}`.                                                                                                                      |
+| Core processing               | JPEG, PNG, WebP, AVIF, SVG uploads through the real HTTP API, every result decoded and its true format checked | PASS: 7 of 7 routes produce decodable output with correct dimensions and alpha.                                                                                                                  |
+| AVIF correctness              | `POST /api/jobs` with `format: avif`                                                                           | Was FAIL, now PASS. See "Fixed during this pass".                                                                                                                                                |
+| HEIC                          | Real HEVC-coded HEIC generated with `heif-enc`, pushed through the API                                         | PASS after fix: HEIC to JPG, to WebP, keep-original, and exact 100 KB all succeed. `heif-info` confirms the fixture is a standard `heic`/`mif1`/`miaf` file.                                     |
+| Exact-size correctness        | `npm run benchmark:exact` plus API tests                                                                       | PASS: every reported success is at or below the requested byte count. Impossible targets return `422 TARGET_IMPOSSIBLE` with actionable advice, not a 500.                                       |
+| TTL lifecycle                 | Processor started with `FILE_TTL_SECONDS=60`, job created, waited past expiry                                  | PASS, 8 of 8: usable before expiry, then read 404, download 404, and the job directory removed from disk.                                                                                        |
+| Startup cleanup               | Expired job planted on disk, processor restarted                                                               | PASS: removed during `JobStore.init`.                                                                                                                                                            |
+| Delete now                    | `DELETE /api/jobs/:id`                                                                                         | PASS: 204, then read 404, download 404, and the directory is gone from disk.                                                                                                                     |
+| Job authorization             | No token, wrong token, malformed header, short token, random id, traversal id                                  | PASS, 7 of 7: 401 or 403 as appropriate, 404 for unknown and traversal ids.                                                                                                                      |
+| Hostile input                 | Shell script renamed `.jpg`, truncated JPEG, SVG containing `<script>`, traversal filename                     | PASS, 4 of 4: `UNSUPPORTED_FORMAT`, `DAMAGED_IMAGE`, `UNSAFE_SVG`, and the filename sanitised to `passwd.jpg`.                                                                                   |
+| Temporary response headers    | Result download headers                                                                                        | PASS: `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff` set by the processor itself.                                                                                      |
+| E2E                           | `npx playwright test` against the served build, Chromium                                                       | PASS: 45 of 45, including compression, 50 KB preset, resize, convert, HEIC, PDF, Base64, colour picker, favicon, passport, signature, metadata, delete, and mobile widths from 320 px to 430 px. |
+| Browser-local privacy         | E2E specs assert zero `/api/` requests                                                                         | PASS: Base64 encode, Base64 decode and viewer, colour picker, and Image to PDF complete with an empty API request list.                                                                          |
+| Accessibility                 | Playwright keyboard and overflow specs, plus Lighthouse accessibility category                                 | PASS: no horizontal overflow at 320, 360, 375, 390, 430, 768, and 1440 px; skip link now moves focus; Lighthouse accessibility 100 on all six sampled routes.                                    |
+| SEO crawl                     | `npm run test:seo`                                                                                             | PASS: 51 canonical URLs, each 200 with unique title, description, canonical, H1, Open Graph, and valid JSON-LD.                                                                                  |
+| Sitemap                       | Parsed `sitemap-pages.xml`, requested every entry                                                              | PASS: 51 URLs, all absolute on `https://compressimage.fun`, all 200, no API, job, localhost, or test routes.                                                                                     |
+| robots.txt                    | Fetched from the served build                                                                                  | PASS: crawlable, `Disallow: /api/`, sitemap referenced.                                                                                                                                          |
+| llms.txt                      | Fetched from the served build                                                                                  | PASS: curated tool and guide list, accurate description of temporary processing, no job or API routes.                                                                                           |
+| Compression benchmark         | `npm run benchmark:compression`                                                                                | PASS, numbers below.                                                                                                                                                                             |
+| Exact-size benchmark          | `npm run benchmark:exact`                                                                                      | PASS, numbers below.                                                                                                                                                                             |
+| Mixed load                    | `npm run test:load`                                                                                            | PASS: 8 concurrent mixed jobs including AVIF, 8 of 8 succeeded in 3.18 s at `PROCESS_CONCURRENCY=2`.                                                                                             |
+| Lighthouse                    | `npm run test:lighthouse`                                                                                      | PASS after fixing the harness, numbers below.                                                                                                                                                    |
+| Absolute paths / placeholders | Repository grep                                                                                                | PASS: no developer machine paths outside the quoted rules in `BUILD_PROMPT.md`; no lorem ipsum or placeholder copy.                                                                              |
+| Docker image build            | `docker compose build`                                                                                         | BLOCKED: egress policy refuses Docker Hub blob downloads. Not a repository defect.                                                                                                               |
+| Compose health wiring         | `docker compose up`                                                                                            | BLOCKED: same cause.                                                                                                                                                                             |
+| Nginx runtime headers         | Response headers from the real Nginx                                                                           | BLOCKED: same cause. `docker/nginx.conf` was reviewed and corrected by inspection.                                                                                                               |
+
+## Fixed during this pass
+
+| Defect                                         | Evidence it was real                                                                                        | Fix                                                                                                                                                                                                                                           |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every AVIF output failed with `OUTPUT_INVALID` | `POST /api/jobs` with `format: avif` returned the error before the change                                   | libvips reports AVIF as `heif`, so output validation compared `heif` against `avif`. `inspect` now resolves HEIF plus `compression: av1` to `avif`.                                                                                           |
+| Uploaded AVIF silently became JPEG             | An AVIF upload with `format: original` returned a 536 KB JPEG from a 504 KB AVIF                            | Same root cause: `resolveOutputFormat` never saw `avif`. Now returns AVIF, 310 KB, alpha preserved.                                                                                                                                           |
+| HEIC could not be decoded at all               | Three independently encoded, structurally valid HEIC files all failed with `bad seek`, while AVIF succeeded | The prebuilt libvips has no HEVC decoder. The processor now transcodes HEIC with libheif's `heif-convert`, which is installed in the processor image. If the binary is missing, uploads fail with a clear message instead of a generic error. |
+| Exact-size AVIF timed out                      | A 50 KB AVIF target failed with `PROCESSING_TIMEOUT` after 60 s                                             | AVIF `effort` lowered from 4 to 3. Measured on these fixtures effort 4 was both slower and larger than effort 3 on photographs. The 50 KB target now completes in 20.7 s.                                                                     |
+| Skip link did not move focus                   | Playwright asserted `#main` never became focused                                                            | `<main>` now carries `tabindex="-1"`.                                                                                                                                                                                                         |
+| Lighthouse harness could not start             | `chrome-launcher` v1 has no default export                                                                  | Switched to the named import and added a `CHROME_PATH` override.                                                                                                                                                                              |
+| Nginx dropped security headers                 | `add_header` in a `location` replaces inherited headers, so static assets and `/api/` lost them             | Headers repeated in both overriding blocks. Reviewed by inspection only, since Nginx could not be run.                                                                                                                                        |
+| Four E2E specs used ambiguous selectors        | Strict-mode violations, not product faults                                                                  | Selectors made exact; the tool-search assertion no longer pins a result count.                                                                                                                                                                |
+
+## Compression benchmark
+
+Synthetic fixtures from `scripts/generate-fixtures.mjs`, single job, no concurrency.
+The photograph fixture is deliberately noisy, which is the worst case for AVIF.
+
+| Fixture                  | Format   | Input     | Output    | Time                                       |
+| ------------------------ | -------- | --------- | --------- | ------------------------------------------ |
+| photograph.jpg 1400x900  | jpeg q82 | 945 343 B | 532 114 B | 89 ms                                      |
+| photograph.jpg           | webp q80 | 945 343 B | 547 186 B | 316 ms                                     |
+| photograph.jpg           | avif q50 | 945 343 B | 246 081 B | 9 805 ms at effort 4, 2 122 ms at effort 3 |
+| illustration.png 900x600 | png      | 24 469 B  | 7 578 B   | 65 ms                                      |
+| illustration.png         | webp q80 | 24 469 B  | 6 892 B   | 41 ms                                      |
+| illustration.png         | avif q50 | 24 469 B  | 3 615 B   | 608 ms                                     |
+
+AVIF effort measured separately on photograph.jpg at quality 50: effort 0 gives
+248 254 B in 208 ms, effort 1 gives 241 775 B in 845 ms, effort 3 gives 234 308 B in
+2 122 ms, and effort 4 gives 246 081 B in 9 765 ms. Effort 3 is smaller and faster
+than effort 4 on both photographic fixtures, which is why it is now the default.
+
+## Exact-size benchmark
+
+`npm run benchmark:exact`. Success means the encoded result is at or below the
+target, which held in every row.
+
+| Fixture          | Target        | Output    | Dimensions | Quality | Encodes | Time          |
+| ---------------- | ------------- | --------- | ---------- | ------- | ------- | ------------- |
+| photograph.jpg   | 20 KB         | 20 335 B  | 336x216    | 55      | 56      | 3 186 ms      |
+| photograph.jpg   | 50 KB         | 50 646 B  | 616x396    | 45      | 41      | 2 579 ms      |
+| photograph.jpg   | 100 KB        | 101 815 B | 952x612    | 39      | 26      | 1 709 ms      |
+| photograph.jpg   | 200 KB        | 202 738 B | 1288x828   | 43      | 11      | 763 ms        |
+| photograph.jpg   | 500 KB        | 508 334 B | 1400x900   | 80      | 6       | 512 ms        |
+| photograph.jpg   | 1 MB          | 950 389 B | 1400x900   | 95      | 6       | 584 ms        |
+| illustration.png | 20 KB to 1 MB | 16 280 B  | 900x600    | 100     | 7       | 372 to 530 ms |
+
+Extreme and impossible targets, measured through the HTTP API:
+
+| Case                    | Result                                                                            |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| photograph to 1 KB      | `422 TARGET_IMPOSSIBLE` with advice to try WebP, fewer pixels, or aggressive mode |
+| photograph to 3 KB      | 3.0 KB at 140x90, note reports the dimension change                               |
+| transparent PNG to 5 KB | 5.0 KB at 395x395                                                                 |
+| icon PNG to 1 KB        | 0.5 KB at 64x64, unchanged dimensions                                             |
+| AVIF to 100 KB          | 95.6 KB at 1288x828 in 10.6 s                                                     |
+| AVIF to 50 KB           | 46.9 KB at 952x612 in 20.7 s                                                      |
+| AVIF to 20 KB           | 19.1 KB at 616x396 in 25.4 s                                                      |
+
+## Lighthouse
+
+Mobile emulation at 390x844, simulated throttling, against the served production
+build. Chromium 1194, `npm run test:lighthouse`.
+
+| Route                                            | Performance | Accessibility | Best practices | SEO | LCP      | TBT  | CLS |
+| ------------------------------------------------ | ----------- | ------------- | -------------- | --- | -------- | ---- | --- |
+| /                                                | 100         | 100           | 96             | 100 | 903 ms   | 0 ms | 0   |
+| /compress-image-to-50kb                          | 100         | 100           | 100            | 100 | 1 505 ms | 0 ms | 0   |
+| /resize-image                                    | 100         | 100           | 100            | 100 | 1 127 ms | 0 ms | 0   |
+| /image-to-base64                                 | 100         | 100           | 100            | 100 | 902 ms   | 0 ms | 0   |
+| /guides/how-to-compress-image-to-exact-file-size | 100         | 100           | 100            | 100 | 901 ms   | 0 ms | 0   |
+| /tools                                           | 100         | 100           | 100            | 100 | 901 ms   | 0 ms | 0   |
+
+## Format matrix
+
+Tested through the HTTP API, with every output decoded and its real format checked
+rather than trusting the file extension.
+
+| Input            | Output                 | Status        | Notes                                                                      |
+| ---------------- | ---------------------- | ------------- | -------------------------------------------------------------------------- |
+| JPEG             | JPEG, WebP, AVIF, PNG  | Tested, pass  | Baseline smart compression saves about 44 percent on the photo fixture.    |
+| PNG with alpha   | WebP, AVIF, PNG        | Tested, pass  | Alpha preserved in WebP and AVIF.                                          |
+| PNG with alpha   | JPEG                   | Tested, pass  | Flattened onto white, as intended.                                         |
+| AVIF             | AVIF, JPEG             | Tested, pass  | Fixed this pass. Keep-original now stays AVIF.                             |
+| HEIC, HEVC coded | JPEG, WebP, exact size | Tested, pass  | Requires `heif-convert`, installed in the processor image.                 |
+| SVG              | PNG                    | Tested, pass  | Active content rejected before processing.                                 |
+| GIF, TIFF        | Accepted as input      | Not exercised | Declared in the accepted MIME list but not covered by a test in this pass. |
+| Animated input   | Rejected               | Tested, pass  | Returns `ANIMATION_UNSUPPORTED` rather than silently flattening.           |
+
+## Not verified
+
+- Docker image build, Compose health wiring, and live Nginx response headers. The
+  network policy in this environment refuses Docker Hub, so no image could be
+  produced. The Dockerfile and Nginx changes are reviewed but not run.
+- Behaviour of the HEIC path inside the built image. The mechanism is verified
+  natively with the same code and the same `heif-convert` tool, but the package
+  install line in the processor stage has not been executed.
+- Firefox and WebKit E2E. Only Chromium was available.
+- Real device testing. Mobile evidence is Chromium emulation at real widths.

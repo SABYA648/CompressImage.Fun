@@ -79,6 +79,26 @@ describe('image engine operations', () => {
     expect(output?.bytes).toBeLessThanOrEqual(targetBytes);
   });
 
+  it('encodes AVIF output that survives its own validation step', async () => {
+    const context = await makeJob({ kind: 'compress', mode: 'smart', format: 'avif' });
+    await context.engine.processJob(context.jobId);
+    const job = await context.store.read(context.jobId);
+    const output = job.files.find((file) => file.role === 'output');
+    expect(job.error).toBeUndefined();
+    expect(job.status).toBe('complete');
+    expect(output?.format).toBe('avif');
+    expect(output?.mime).toBe('image/avif');
+  });
+
+  it('reports an AVIF source as AVIF rather than the raw HEIF container name', async () => {
+    const context = await makeJob({ kind: 'compress', mode: 'smart', format: 'avif' });
+    const avifPath = context.store.filePath(context.jobId, 'probe-source.avif');
+    await sharp({ create: { width: 120, height: 90, channels: 3, background: '#12364b' } })
+      .avif({ quality: 50 })
+      .toFile(avifPath);
+    expect((await context.engine.inspect(avifPath)).format).toBe('avif');
+  });
+
   it('generates ICO, PNG sizes, and a safe HTML snippet for favicons', async () => {
     const context = await makeJob({ kind: 'favicon', fit: 'contain', background: '#ffffff' });
     await context.engine.processJob(context.jobId);

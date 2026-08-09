@@ -78,6 +78,10 @@ const schema =
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    <!-- Declaring icons stops the browser requesting /favicon.ico and logging a 404. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta property="og:type" content={pageType === 'article' ? 'article' : 'website'} />
     <meta property="og:site_name" content="compressimage.fun" />
     <meta property="og:title" content={title} />
@@ -115,7 +119,8 @@ const schema =
         </nav>
       </div>
     </header>
-    <main id="main"><slot /></main>
+    <!-- tabindex allows the skip link to move focus here, not just scroll the page. -->
+    <main id="main" tabindex="-1"><slot /></main>
     <footer class="site-footer">
       <div class="shell footer-grid">
         <div>

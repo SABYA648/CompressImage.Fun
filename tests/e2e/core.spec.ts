@@ -115,8 +115,10 @@ test('metadata can be inspected and removed', async ({ page }) => {
   await page.goto('/image-metadata');
   await page.locator('input[type=file]').setInputFiles(photo);
   await page.getByRole('button', { name: 'Inspect metadata' }).click();
-  await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('JPEG')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Metadata', exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByText('JPEG', { exact: true })).toBeVisible();
   await page.goto('/remove-image-metadata');
   await page.locator('input[type=file]').setInputFiles(photo);
   await page.getByRole('button', { name: /Process image/ }).click();
@@ -140,8 +142,11 @@ test('favicon generator creates ICO, PNG, snippet, and ZIP', async ({ page }) =>
   await page.locator('input[type=file]').setInputFiles(transparent);
   await page.getByRole('button', { name: 'Generate icons' }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByText('favicon.ico')).toBeVisible();
-  await expect(page.getByText('favicon-html-snippet.txt')).toBeVisible();
+  // Match the result headings, not the prose above them that names the same files.
+  await expect(page.getByRole('heading', { name: 'favicon.ico', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'favicon-html-snippet.txt', exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download all ZIP' })).toBeVisible();
 });
 
@@ -159,8 +164,14 @@ test('color picker reads pixels and palette without upload', async ({ page }) =>
 
 test('tool search and public crawl files work', async ({ page, request }) => {
   await page.goto('/tools');
+  const visibleCards = page.locator('.tool-card:not([hidden])');
+  const total = await visibleCards.count();
   await page.getByLabel('Search tools').fill('heic');
-  await expect(page.locator('.tool-card:not([hidden])')).toHaveCount(1);
+  // "heic" matches the dedicated converter and the general one that accepts HEIC
+  // input, so assert the search narrows to those rather than pinning a count.
+  await expect(visibleCards.filter({ hasText: 'HEIC to JPG Converter' })).toHaveCount(1);
+  await expect(visibleCards.filter({ hasText: 'Resize a passport or form photo' })).toHaveCount(0);
+  expect(await visibleCards.count()).toBeLessThan(total);
   for (const path of ['/robots.txt', '/sitemap-index.xml', '/llms.txt'])
     expect((await request.get(path)).status()).toBe(200);
   expect((await request.get('/missing-route-for-test')).status()).toBe(404);

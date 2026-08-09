@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from '@playwright/test';
-import chromeLauncher from 'chrome-launcher';
+import { launch } from 'chrome-launcher';
 import lighthouse from 'lighthouse';
 
 const base = process.env.BASE_URL ?? 'http://web:8080';
@@ -14,8 +14,10 @@ const routes = [
   '/tools',
 ];
 await mkdir('artifacts/lighthouse', { recursive: true });
-const chrome = await chromeLauncher.launch({
-  chromePath: chromium.executablePath(),
+const chrome = await launch({
+  // CHROME_PATH lets a runner reuse a Chromium it already has instead of the
+  // browser Playwright would download for its own pinned version.
+  chromePath: process.env.CHROME_PATH || chromium.executablePath(),
   chromeFlags: ['--headless', '--no-sandbox', '--disable-dev-shm-usage'],
 });
 const summaries = [];
