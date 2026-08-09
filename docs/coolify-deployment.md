@@ -13,7 +13,9 @@ Everything below is taken from `docker-compose.yml`, `Dockerfile`, and
 | Docker Compose Location | `/docker-compose.yml` |
 
 Do not deploy the two images as separate applications. The web service resolves
-the processor by its Compose service name over the internal network.
+the processor by its Compose service name on the default Compose network.
+Do not add repository-defined custom Docker networks; Coolify manages
+deployment and proxy networking.
 
 ## Domains (Coolify UI)
 
@@ -33,7 +35,7 @@ Public canonical URL remains:
 
 Coolify must route:
 
-Internet → Coolify proxy → `web:8080` → `processor` on the internal network
+Internet → Coolify proxy → `web:8080` → `processor` on the Compose network
 
 Do not publish host port 8080 on the VPS. Production `docker-compose.yml` does
 not map `0.0.0.0:8080`; `web` only exposes container port 8080 on the Compose
@@ -72,21 +74,20 @@ is intentional. Only `/data/jobs` needs to be writable.
 | Health path   | `/health` on `web` |
 | Expected body | `{"status":"ok"}` |
 
-Configure Coolify's health check against `/health` on the `web` service. It is a
-liveness probe: constant response, no dependencies, no authentication.
+Configure Coolify's health check against `/health` on the `web` service only.
+`/health` is answered locally by Nginx and does not call the processor.
 
-`/ready` additionally confirms the temporary storage directory is reachable and
-reports queue depth. It is useful for debugging and for orchestrators that
-distinguish readiness from liveness, but Coolify only needs `/health`. Both
-Compose services already define their own `HEALTHCHECK`, and `web` waits for
-`processor` to report healthy before it starts.
+`/ready` proxies to the processor and confirms the temporary storage directory
+is reachable and reports queue depth. Use it for dependency diagnostics, not
+for Coolify public routing health. Both Compose services define their own
+`HEALTHCHECK`; `web` starts after the `processor` container exists but does not
+wait for processor health.
 
 ## Network isolation
 
-`processor` has no domain, no host port mapping, and is attached only to the
-`internal` network (`internal: true`). There is no separate public processor and
-no `api.compressimage.fun`. Reach it only through `web`, which proxies `/api/`,
-`/health`, and `/ready`.
+`processor` has no domain and no host port mapping. There is no separate public
+processor and no `api.compressimage.fun`. Reach it only through `web`, which
+proxies `/api/` and `/ready`.
 
 ## TLS
 

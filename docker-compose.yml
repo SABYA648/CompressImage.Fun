@@ -30,16 +30,13 @@ services:
           cpus: '3.5'
           memory: 12G
     restart: unless-stopped
-    networks:
-      - internal
 
   web:
     build:
       context: .
       target: web
     depends_on:
-      processor:
-        condition: service_healthy
+      - processor
     # No host port publish. Coolify routes https://compressimage.fun to
     # container port 8080 over the Compose network. For local localhost:8080
     # access, use docker-compose.override.yml (gitignored) or:
@@ -57,9 +54,6 @@ services:
     cap_drop:
       - ALL
     restart: unless-stopped
-    networks:
-      - internal
-      - edge
 
   e2e:
     profiles: [qa]
@@ -72,13 +66,6 @@ services:
     environment:
       BASE_URL: http://web:8080
     ipc: host
-    networks:
-      - internal
 
 volumes:
   jobs:
-
-networks:
-  internal:
-    internal: true
-  edge:
