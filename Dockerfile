@@ -32,9 +32,12 @@ ENV NODE_ENV=production \
     VIPS_BLOCK_UNTRUSTED=true \
     MALLOC_ARENA_MAX=2
 # The bundled libvips decodes AV1 but not HEVC, so HEIC needs libheif's own
-# converter. Without this package HEIC uploads fail with a clear message instead.
+# converter. Since libheif 1.15, Debian/Ubuntu ship the HEVC decode backend as
+# a separate plugin package that libheif-examples does not pull in on its own
+# -- without it, heif-convert exists but has no decoder to use. Without either
+# package HEIC uploads fail with a clear message instead.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libheif-examples \
+    && apt-get install -y --no-install-recommends libheif-examples libheif-plugin-libde265 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=production-dependencies /app/node_modules ./node_modules

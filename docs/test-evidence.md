@@ -4,6 +4,12 @@ Evidence below was produced on 2026-08-09 in the release-hardening environment, 
 the commit recorded at the bottom of this page. Every row states what was actually
 run and where. A row marked BLOCKED is not evidence of success.
 
+A second pass ran later the same day (2026-08-09) specifically to attempt the
+Docker verification this document lists as blocked. Its result and evidence are in
+"Docker verification pass" below; it did not change any row in the original
+"Gates" table above it, because it did not obtain registry access either. Only the
+three rows already marked BLOCKED for Docker reasons gained more precise detail.
+
 ## Environment
 
 | Property        | Value                                                                                                                                                                                              |
@@ -56,9 +62,10 @@ Nginx runtime, and the Compose health wiring; those are listed as BLOCKED.
 | Mixed load                    | `npm run test:load`                                                                                            | PASS: 8 concurrent mixed jobs including AVIF, 8 of 8 succeeded in 3.18 s at `PROCESS_CONCURRENCY=2`.                                                                                             |
 | Lighthouse                    | `npm run test:lighthouse`                                                                                      | PASS after fixing the harness, numbers below.                                                                                                                                                    |
 | Absolute paths / placeholders | Repository grep                                                                                                | PASS: no developer machine paths outside the quoted rules in `BUILD_PROMPT.md`; no lorem ipsum or placeholder copy.                                                                              |
-| Docker image build            | `docker compose build`                                                                                         | BLOCKED: egress policy refuses Docker Hub blob downloads. Not a repository defect.                                                                                                               |
-| Compose health wiring         | `docker compose up`                                                                                            | BLOCKED: same cause.                                                                                                                                                                             |
-| Nginx runtime headers         | Response headers from the real Nginx                                                                           | BLOCKED: same cause. `docker/nginx.conf` was reviewed and corrected by inspection.                                                                                                               |
+| Docker image build            | `docker compose build --pull`                                                                                  | BLOCKED, re-confirmed in the later Docker verification pass. Not a repository defect. Detail below.                                                                                              |
+| Compose health wiring         | `docker compose up`                                                                                            | BLOCKED: same cause. `docker compose config` (no pull required) validates cleanly. Detail below.                                                                                                 |
+| Nginx runtime headers         | Response headers from the real Nginx                                                                           | BLOCKED: same cause. `docker/nginx.conf` was reviewed and corrected by inspection. No change needed in the Docker verification pass.                                                            |
+| HEIC decoder packaging        | `apt-cache depends` on the `libheif-examples` dependency chain, no registry needed                             | Gap found and fixed, **not** verified by an actual build. Detail below.                                                                                                                           |
 
 ## Fixed during this pass
 
@@ -72,6 +79,103 @@ Nginx runtime, and the Compose health wiring; those are listed as BLOCKED.
 | Lighthouse harness could not start             | `chrome-launcher` v1 has no default export                                                                  | Switched to the named import and added a `CHROME_PATH` override.                                                                                                                                                                              |
 | Nginx dropped security headers                 | `add_header` in a `location` replaces inherited headers, so static assets and `/api/` lost them             | Headers repeated in both overriding blocks. Reviewed by inspection only, since Nginx could not be run.                                                                                                                                        |
 | Four E2E specs used ambiguous selectors        | Strict-mode violations, not product faults                                                                  | Selectors made exact; the tool-search assertion no longer pins a result count.                                                                                                                                                                |
+
+## Docker verification pass
+
+Ran later on 2026-08-09, in a separate session, specifically to build and run the
+actual production images and flip the BLOCKED rows above. Started from
+`claude/compressimage-final-hardening-7i1ooe` at commit `aa6e386`, fast-forwarded
+onto the release branch. Repeats the registry check the prior pass reported and
+goes one step further with a read-only packaging investigation.
+
+### Registry access
+
+The Docker daemon was not running by default in this session and was started
+manually (`dockerd`, since the init script's `ulimit -Hn` call is not permitted in
+this sandbox). Once running:
+
+- `docker pull node:24-bookworm-slim` — fails: `403 Forbidden` opening a blob at
+  `https://production.cloudfront.docker.com/registry-v2/.../blobs/sha256/...`.
+- `docker pull nginx:1.28-alpine` — fails the same way, same host.
+- The session's agent-proxy status endpoint (`$HTTPS_PROXY/__agentproxy/status`)
+  logs the cause directly: `recentRelayFailures: {"kind":"connect_rejected`,
+  `"detail":"gateway answered 403 to CONNECT (policy denial or upstream failure)"`,
+  `"host":"production.cloudfront.docker.com:443"}`. This is an organization egress
+  policy decision, confirmed identical to the previous pass's finding, not a
+  transient failure or a proxy misconfiguration on this repository's side.
+- General package-metadata hosts (`packages.debian.org`, `sources.debian.org`,
+  `deb.debian.org`) were also tried, in case Dockerfile package names could be
+  confirmed without a registry, and were blocked the same way (`403` on the
+  `CONNECT` tunnel). No outbound host outside the pre-approved allowlist
+  (`no_proxy`: npm, PyPI, crates, Go proxy, jsr, and a few infra domains) is
+  reachable from this session.
+- Per policy, downloads were not retried beyond the two required base images plus
+  the one general-purpose check above. `docker compose build`, `docker compose
+  up`, in-container HEIC/AVIF verification, storage-restart verification, live
+  Nginx headers, and the compact Docker browser smoke could therefore not run.
+  These remain BLOCKED, exactly as the prior pass reported.
+
+### Compose file validity (does not require a registry)
+
+`docker compose config` renders and validates `docker-compose.yml` without pulling
+anything, and succeeds. Confirmed structurally, from the rendered output:
+
+- `processor` publishes no ports and is attached only to `internal`
+  (`internal: true`, not routable from the host or internet).
+- `web` publishes `8080:8080`, is attached to both `internal` and `edge`, and
+  `depends_on: processor: condition: service_healthy`.
+- The `jobs` named volume mounts to `/data/jobs` on `processor` only.
+
+This confirms the Compose file itself is well-formed and matches
+`docs/coolify-deployment.md`. It does not confirm the containers actually start
+healthy, since that requires the images to exist.
+
+### HEIC decoder packaging — gap found, fixed, unverified by build
+
+Section 3 of this pass's brief specifically warns that `heif-convert` can exist
+while its HEVC decoder plugin is absent, and asks for that to be checked rather
+than assumed. The actual production image could not be built to check it
+directly, so the same question was checked one layer down, against package
+metadata for the same `libheif` source package (same upstream, same Debian
+Multimedia Team maintainer, on a same-family Linux distribution available in this
+sandbox):
+
+```
+$ apt-cache depends libheif-examples
+libheif-examples
+  Depends: libheif1
+  Depends: libc6
+  Depends: libgcc-s1
+  Depends: libjpeg8
+  Depends: libpng16-16t64
+  Depends: libstdc++6
+```
+
+No HEVC or AV1 decoder plugin is pulled in by `libheif-examples`. Since libheif
+1.15, Debian and Ubuntu ship each libheif codec backend as its own plugin
+package (`libheif-plugin-libde265` for HEVC decode, `libheif-plugin-aomdec` for
+AV1 decode, `libheif-plugin-x265` for HEVC encode, and so on); `libheif-examples`
+only provides the `heif-convert`/`heif-enc`/`heif-info` binaries, not any codec.
+The processor Dockerfile installed only `libheif-examples`, so `heif-convert
+--version` (the processor's own availability probe in
+`apps/processor/src/image-engine.ts`) would very likely succeed while the actual
+`heif-convert <heic-file> out.png` decode call fails for lack of a usable decoder
+— exactly the failure mode this pass's brief called out by name.
+
+Fix applied to `Dockerfile`: added `libheif-plugin-libde265` next to
+`libheif-examples` in the `processor` stage. Decode-only, matching the brief's
+instruction not to add HEVC encoding support (`libheif-plugin-x265`) since the
+application never encodes HEIC. AVIF is unaffected: AV1 is decoded by libvips
+directly, not through `heif-convert`, so no AV1 plugin package was added.
+
+This fix is a same-family package-metadata inference, not a container-verified
+fact, because no image could be built in this environment. It must be the first
+thing confirmed on a registry-connected host: build the processor image, exec
+into the running container, and confirm `heif-convert` actually decodes a real
+HEIC fixture (see "Owner action" in the handoff report). If the package name
+differs on `node:24-bookworm-slim` specifically, `apt-get install` will fail
+loudly at build time rather than shipping a silently non-functional decoder,
+which was judged the safer failure mode.
 
 ## Compression benchmark
 
@@ -151,11 +255,26 @@ rather than trusting the file extension.
 
 ## Not verified
 
-- Docker image build, Compose health wiring, and live Nginx response headers. The
-  network policy in this environment refuses Docker Hub, so no image could be
-  produced. The Dockerfile and Nginx changes are reviewed but not run.
+- Docker image build, Compose health wiring, and live Nginx response headers.
+  Re-attempted in a dedicated Docker verification pass later on 2026-08-09; the
+  network policy still refuses Docker Hub blob downloads for both required base
+  images, confirmed as an organization policy denial rather than a transient
+  failure (see "Docker verification pass" above). The Dockerfile and Nginx
+  changes are reviewed but still not run.
 - Behaviour of the HEIC path inside the built image. The mechanism is verified
-  natively with the same code and the same `heif-convert` tool, but the package
-  install line in the processor stage has not been executed.
+  natively with the same processor code and the same `heif-convert` tool. The
+  Docker verification pass found, from package metadata rather than a build,
+  that the processor image's package list was very likely missing the HEVC
+  decoder plugin and added `libheif-plugin-libde265`; this fix itself is also
+  unverified, since it still requires a build this environment cannot perform.
 - Firefox and WebKit E2E. Only Chromium was available.
 - Real device testing. Mobile evidence is Chromium emulation at real widths.
+
+## Commits
+
+- `aa6e386` — AVIF/HEIC pipeline fixes, header hardening, native verification
+  (`claude/compressimage-final-hardening-7i1ooe`), described throughout this
+  document except the "Docker verification pass" section.
+- Docker verification pass — HEIC decoder packaging fix and this document's
+  Docker-related updates, on `claude/compressimage-docker-release-ycp1xz`
+  (fast-forwarded from `aa6e386`).
