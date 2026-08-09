@@ -7,8 +7,11 @@ run and where. A row marked BLOCKED is not evidence of success.
 A second pass ran later the same day (2026-08-09) specifically to attempt the
 Docker verification this document lists as blocked. Its result and evidence are in
 "Docker verification pass" below; it did not change any row in the original
-"Gates" table above it, because it did not obtain registry access either. Only the
-three rows already marked BLOCKED for Docker reasons gained more precise detail.
+"Gates" table above it, because it did not obtain registry access either — the
+three rows already marked BLOCKED for Docker reasons gained more precise detail
+instead. It did fix one real, previously-unverified gap outside the registry
+(HEIC decoder packaging) and prove the fix works, using the host directly rather
+than a container. That row is new, not a change to prior evidence.
 
 ## Environment
 
@@ -65,7 +68,7 @@ Nginx runtime, and the Compose health wiring; those are listed as BLOCKED.
 | Docker image build            | `docker compose build --pull`                                                                                  | BLOCKED, re-confirmed in the later Docker verification pass. Not a repository defect. Detail below.                                                                                              |
 | Compose health wiring         | `docker compose up`                                                                                            | BLOCKED: same cause. `docker compose config` (no pull required) validates cleanly. Detail below.                                                                                                 |
 | Nginx runtime headers         | Response headers from the real Nginx                                                                           | BLOCKED: same cause. `docker/nginx.conf` was reviewed and corrected by inspection. No change needed in the Docker verification pass.                                                            |
-| HEIC decoder packaging        | `apt-cache depends` on the `libheif-examples` dependency chain, no registry needed                             | Gap found and fixed, **not** verified by an actual build. Detail below.                                                                                                                           |
+| HEIC decoder packaging        | `apt-cache depends`, then a real `heif-enc`/`heif-convert` A/B decode test on the host, no registry needed     | Gap found, fixed, and functionally proven on a same-family distro. Still not run inside the actual container. Detail below.                                                                      |
 
 ## Fixed during this pass
 
@@ -103,12 +106,19 @@ this sandbox). Once running:
   `"host":"production.cloudfront.docker.com:443"}`. This is an organization egress
   policy decision, confirmed identical to the previous pass's finding, not a
   transient failure or a proxy misconfiguration on this repository's side.
-- General package-metadata hosts (`packages.debian.org`, `sources.debian.org`,
-  `deb.debian.org`) were also tried, in case Dockerfile package names could be
-  confirmed without a registry, and were blocked the same way (`403` on the
-  `CONNECT` tunnel). No outbound host outside the pre-approved allowlist
-  (`no_proxy`: npm, PyPI, crates, Go proxy, jsr, and a few infra domains) is
-  reachable from this session.
+- General Debian package-metadata hosts (`packages.debian.org`,
+  `sources.debian.org`, `deb.debian.org`) were also tried, in case Dockerfile
+  package names could be confirmed without a registry, and were blocked the same
+  way (`403` on the `CONNECT` tunnel). This sandbox's own OS is Ubuntu, not
+  Debian, and its own package archive (`archive.ubuntu.com`) turned out to be
+  reachable, along with `registry.npmjs.org` and `download.docker.com` (the apt
+  repo for the Docker Engine packages, distinct from the Docker Hub image
+  registry/CDN that is blocked). That let this pass install the host's own
+  `libheif-examples` / `libheif-plugin-libde265` / `libheif-plugin-x265` packages
+  and run a real functional decode test — see "HEIC decoder packaging" below —
+  without touching the blocked registry. It does not change the registry
+  finding: the container image registry itself, and Debian's package mirrors
+  specifically, remain blocked from this session.
 - Per policy, downloads were not retried beyond the two required base images plus
   the one general-purpose check above. `docker compose build`, `docker compose
   up`, in-container HEIC/AVIF verification, storage-restart verification, live
@@ -130,52 +140,72 @@ This confirms the Compose file itself is well-formed and matches
 `docs/coolify-deployment.md`. It does not confirm the containers actually start
 healthy, since that requires the images to exist.
 
-### HEIC decoder packaging — gap found, fixed, unverified by build
+### HEIC decoder packaging — gap found, fixed, functionally proven outside the container
 
 Section 3 of this pass's brief specifically warns that `heif-convert` can exist
 while its HEVC decoder plugin is absent, and asks for that to be checked rather
 than assumed. The actual production image could not be built to check it
-directly, so the same question was checked one layer down, against package
-metadata for the same `libheif` source package (same upstream, same Debian
-Multimedia Team maintainer, on a same-family Linux distribution available in this
-sandbox):
+directly (registry still blocked, below), so the same question was answered two
+different ways on the host instead: first from package metadata, then with a
+real functional decode test.
+
+**Package metadata.** `libheif-examples` depends on `libheif1`, `libc6`,
+`libgcc-s1`, `libjpeg8`, `libpng16-16t64`, `libstdc++6` — no codec plugin. Since
+libheif 1.15, Debian and Ubuntu ship each codec backend as its own plugin package
+(`libheif-plugin-libde265` for HEVC decode, `libheif-plugin-aomdec` for AV1
+decode, `libheif-plugin-x265` for HEVC encode, eleven such plugins in total on
+this host's archive); `libheif-examples` only provides the
+`heif-convert`/`heif-enc`/`heif-info` binaries, no codec.
+
+**Functional A/B proof.** The host in this sandbox is Ubuntu 24.04 (`noble`),
+not Debian 12 (`bookworm`), but both track the same `libheif` upstream source
+package under the same Debian Multimedia Team maintainer, with the same plugin
+split. `libheif-examples` and `libheif-plugin-libde265` were installed on the
+host (via `archive.ubuntu.com`, not the blocked Docker registry), a real
+HEVC-coded HEIC fixture was generated with `heif-enc` from the project's own
+`scripts/generate-fixtures.mjs`, and confirmed genuine with `heif-info`
+(`MIME type: image/heic`, brands `heic`/`mif1`/`miaf`, 1400x900). Then, using the
+exact command `apps/processor/src/image-engine.ts` runs
+(`heif-convert --quality 100 <in> <out>`):
 
 ```
-$ apt-cache depends libheif-examples
-libheif-examples
-  Depends: libheif1
-  Depends: libc6
-  Depends: libgcc-s1
-  Depends: libjpeg8
-  Depends: libpng16-16t64
-  Depends: libstdc++6
+$ mv /usr/lib/x86_64-linux-gnu/libheif/plugins/libheif-libde265.so{,.disabled}
+$ heif-convert --quality 100 photograph.heic out.png
+File contains 1 image
+Could not decode image: 0: Unsupported feature: Unsupported codec   # exit 1
+
+$ mv /usr/lib/x86_64-linux-gnu/libheif/plugins/libheif-libde265.so{.disabled,}
+$ heif-convert --quality 100 photograph.heic out.png
+File contains 1 image
+Written to out.png                                                  # exit 0
+$ file out.png
+out.png: PNG image data, 1400 x 900, 8-bit/color RGB, non-interlaced
 ```
 
-No HEVC or AV1 decoder plugin is pulled in by `libheif-examples`. Since libheif
-1.15, Debian and Ubuntu ship each libheif codec backend as its own plugin
-package (`libheif-plugin-libde265` for HEVC decode, `libheif-plugin-aomdec` for
-AV1 decode, `libheif-plugin-x265` for HEVC encode, and so on); `libheif-examples`
-only provides the `heif-convert`/`heif-enc`/`heif-info` binaries, not any codec.
-The processor Dockerfile installed only `libheif-examples`, so `heif-convert
---version` (the processor's own availability probe in
-`apps/processor/src/image-engine.ts`) would very likely succeed while the actual
-`heif-convert <heic-file> out.png` decode call fails for lack of a usable decoder
-— exactly the failure mode this pass's brief called out by name.
+This reproduces, byte-for-byte, the exact failure the current (unfixed)
+Dockerfile ships today — `heif-convert` exists, decode still fails, `"Unsupported
+codec"` — and confirms the fix restores a correct, correctly-dimensioned decode
+of a real HEVC-coded HEIC file, using the same binary and invocation the
+application uses. `apps/processor/src/image-engine.ts` already treats a
+`heif-convert` failure as a clean, safe fallback (`HEIC_DECODE_UNAVAILABLE`, not
+a crash), so this was never a stability risk — only a silently-missing feature,
+now closed with evidence rather than a guess.
 
 Fix applied to `Dockerfile`: added `libheif-plugin-libde265` next to
 `libheif-examples` in the `processor` stage. Decode-only, matching the brief's
 instruction not to add HEVC encoding support (`libheif-plugin-x265`) since the
-application never encodes HEIC. AVIF is unaffected: AV1 is decoded by libvips
-directly, not through `heif-convert`, so no AV1 plugin package was added.
+application never encodes HEIC — the encoder was installed only on the host, only
+to synthesize the test fixture above, and is not part of any shipped image. AVIF
+is unaffected: AV1 is decoded by libvips directly, not through `heif-convert`, so
+no AV1 plugin package was added.
 
-This fix is a same-family package-metadata inference, not a container-verified
-fact, because no image could be built in this environment. It must be the first
-thing confirmed on a registry-connected host: build the processor image, exec
-into the running container, and confirm `heif-convert` actually decodes a real
-HEIC fixture (see "Owner action" in the handoff report). If the package name
-differs on `node:24-bookworm-slim` specifically, `apt-get install` will fail
-loudly at build time rather than shipping a silently non-functional decoder,
-which was judged the safer failure mode.
+What remains genuinely unverified is narrower than before: not "does this
+concept work" (proven above) but "does Debian bookworm's apt archive spell the
+package `libheif-plugin-libde265` too." It does on every other libheif-plugin-era
+Debian/Ubuntu release this pass could check, and the failure mode if the name is
+ever wrong is a loud `apt-get install` build failure, not a silent runtime bug —
+still worth the first check on a registry-connected host, but no longer the main
+risk it was.
 
 ## Compression benchmark
 
@@ -261,12 +291,15 @@ rather than trusting the file extension.
   images, confirmed as an organization policy denial rather than a transient
   failure (see "Docker verification pass" above). The Dockerfile and Nginx
   changes are reviewed but still not run.
-- Behaviour of the HEIC path inside the built image. The mechanism is verified
-  natively with the same processor code and the same `heif-convert` tool. The
-  Docker verification pass found, from package metadata rather than a build,
-  that the processor image's package list was very likely missing the HEVC
-  decoder plugin and added `libheif-plugin-libde265`; this fix itself is also
-  unverified, since it still requires a build this environment cannot perform.
+- Behaviour of the HEIC path inside the *built image specifically*. The
+  application mechanism is verified natively with the same processor code and
+  the same `heif-convert` tool. The Docker verification pass additionally found
+  that the processor image's package list was missing the HEVC decoder plugin,
+  added `libheif-plugin-libde265`, and functionally proved the fix with a real
+  encode/decode A/B test on a same-family host distro (see above) — but that
+  proof is still outside the actual `node:24-bookworm-slim`-based container,
+  since no image could be built here. Confirming it inside the real container is
+  now a fast sanity check rather than an open question.
 - Firefox and WebKit E2E. Only Chromium was available.
 - Real device testing. Mobile evidence is Chromium emulation at real widths.
 
