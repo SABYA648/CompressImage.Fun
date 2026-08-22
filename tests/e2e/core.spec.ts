@@ -187,6 +187,9 @@ test('every tool page pattern exposes five useful stories and guides contain the
     page.getByRole('heading', { name: 'Resize a passport or form photo', exact: true }),
   ).toBeVisible();
   await page.locator('.guide-tool').scrollIntoViewIfNeeded();
+  // client:visible ships useful SSR immediately, then hydrates in the viewport.
+  // Wait for Astro's SSR marker to disappear so React cannot miss the selection.
+  await expect(page.locator('.guide-tool astro-island[ssr]')).toHaveCount(0);
   await page.locator('.guide-tool input[type=file]').setInputFiles(photo);
   await page
     .locator('.guide-tool')
