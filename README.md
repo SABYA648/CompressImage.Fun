@@ -109,3 +109,5 @@ Please open a focused issue or pull request. Add deterministic fixtures for proc
 ## License
 
 Application code is MIT licensed. Native libraries and npm packages retain their own licenses. See [third-party licenses](THIRD_PARTY_LICENSES.md).
+
+.
