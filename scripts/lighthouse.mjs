@@ -11,7 +11,7 @@ const routes = [
   '/resize-image',
   '/image-to-base64',
   '/guides/how-to-compress-image-to-exact-file-size',
-  '/tools',
+  '/how-processing-works',
 ];
 await mkdir('artifacts/lighthouse', { recursive: true });
 const chrome = await launch({

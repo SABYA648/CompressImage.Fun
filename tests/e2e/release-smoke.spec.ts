@@ -18,7 +18,9 @@ test('homepage compresses, downloads, and deletes without console errors', async
     if (msg.type() === 'error') errors.push(msg.text());
   });
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Compress images');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    'Compress an image to the size you actually need',
+  );
   await page.locator('input[type=file]').setInputFiles(photo);
   await page.getByRole('button', { name: /Process image/ }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });

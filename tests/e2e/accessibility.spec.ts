@@ -41,6 +41,15 @@ for (const width of [320, 360, 375, 390, 430]) {
   }
 }
 
+test('primary navigation remains visible on a 390 px phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Exact size' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Privacy' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'How it works' })).toBeVisible();
+});
+
 test('primary navigation and uploader are keyboard reachable', async ({ page }) => {
   await page.goto('/');
   await page.keyboard.press('Tab');

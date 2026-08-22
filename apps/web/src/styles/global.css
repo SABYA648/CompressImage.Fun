@@ -108,7 +108,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px 24px;
+  flex-wrap: wrap;
+  padding-block: 8px;
 }
 .brand {
   display: inline-flex;
@@ -152,7 +154,9 @@ button {
 .site-header nav {
   display: flex;
   align-items: center;
-  gap: 26px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px 18px;
 }
 .site-header nav a {
   text-decoration: none;
@@ -1044,6 +1048,65 @@ button {
   margin: 8px 0;
 }
 
+.job-grid,
+.faq-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.job-card {
+  display: block;
+  text-decoration: none;
+  background: white;
+  border: 1px solid var(--line);
+  padding: 20px 22px;
+}
+.job-card:hover {
+  border-color: var(--ink);
+  box-shadow: 5px 5px 0 var(--accent);
+}
+.job-card strong {
+  display: block;
+  margin-bottom: 6px;
+  letter-spacing: -0.03em;
+}
+.job-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.preset-switch {
+  margin-top: 28px;
+  font-size: 1.05rem;
+}
+.flow-diagram,
+.flow-list {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.flow-diagram {
+  overflow-x: auto;
+  padding: 18px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+.table-wrap {
+  overflow-x: auto;
+}
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.article-body th,
+.article-body td {
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
 .site-footer {
   background: var(--ink);
   color: white;
@@ -1095,8 +1158,11 @@ button {
   .shell {
     width: min(100% - 28px, 720px);
   }
-  .site-header nav a:not(:first-child) {
-    display: none;
+  .site-header nav {
+    gap: 8px 12px;
+  }
+  .site-header nav a {
+    font-size: 0.82rem;
   }
   .hero {
     padding-top: 40px;
@@ -1125,7 +1191,9 @@ button {
     order: initial;
   }
   .feature-grid,
-  .tool-grid {
+  .tool-grid,
+  .job-grid,
+  .faq-list {
     grid-template-columns: repeat(2, 1fr);
   }
   .related-grid {
@@ -1142,6 +1210,11 @@ button {
 @media (max-width: 520px) {
   .shell {
     width: min(100% - 20px, 480px);
+  }
+  .job-grid,
+  .faq-list,
+  .guide-grid {
+    grid-template-columns: 1fr;
   }
   .header-inner {
     min-height: 58px;

@@ -15,6 +15,7 @@
 - Verify HTTPS, the canonical apex domain, and a deliberate www redirect.
 - Add optional Google and Bing verification tokens through environment configuration.
 - Register Search Console and Bing Webmaster Tools, then submit `sitemap-index.xml`.
-- Fetch robots.txt, sitemap, and llms.txt from the public domain.
-- Add GA only when desired and verify private values stay absent from events.
-- Monitor indexing, queries, crawl errors, and Core Web Vitals.
+- Fetch robots.txt, sitemap, llms.txt, `/how-processing-works`, and `/privacy` from the public domain.
+- Confirm production HTML analytics IDs match `/privacy`.
+- Confirm `www` 301s to the apex.
+- Monitor indexing, queries, crawl errors, and Core Web Vitals. Do not invent volumes.

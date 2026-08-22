@@ -387,7 +387,8 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
               </div>
             </div>
             <div class="privacy-note">
-              Processed securely on our server. Files auto-delete within four hours.
+              Processed on compressimage.fun servers. Files auto-delete within four hours. This is
+              not a no-upload tool.
             </div>
           </>
         ) : (
