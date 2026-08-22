@@ -31,6 +31,7 @@ const schema =
         headline: h1 ?? title,
         description,
         mainEntityOfPage: canonical,
+        inLanguage: 'en-US',
         publisher: {
           '@type': 'Organization',
           name: 'compressimage.fun',
@@ -46,7 +47,7 @@ const schema =
             url: 'https://compressimage.fun/',
             name: 'compressimage.fun',
             description:
-              'Free image compression and conversion tools without signup or watermarks.',
+              'Free image compression, exact-size targeting, and conversion tools without signup or watermarks.',
           },
           ...(pageType === 'tool'
             ? [
@@ -55,10 +56,12 @@ const schema =
                   name: h1 ?? title,
                   url: canonical,
                   applicationCategory: 'MultimediaApplication',
-                  operatingSystem: 'Any',
+                  operatingSystem: 'All',
                   browserRequirements: 'Requires a modern web browser',
                   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
                   description,
+                  featureList:
+                    'Exact KB/MB targeting, quality-first optimization, batch processing, zero watermark, 4-hour automatic file deletion',
                 },
               ]
             : []),
@@ -132,6 +135,7 @@ const schema =
           <a href="/tools" data-umami-event="Nav Click: All Tools">All tools</a>
           <a href="/compress-image-to-size" data-umami-event="Nav Click: Exact Size">Exact size</a>
           <a href="/guides" data-umami-event="Nav Click: Guides">Guides</a>
+          <a href="/about" data-umami-event="Nav Click: About">About</a>
           <a href="/privacy" data-umami-event="Nav Click: Privacy">Privacy</a>
         </nav>
       </div>
@@ -160,6 +164,8 @@ const schema =
         <div>
           <h2>Project</h2>
           <ul>
+            <li><a href="/about" data-umami-event="Footer Link Click: About">About</a></li>
+            <li><a href="/methodology/compression" data-umami-event="Footer Link Click: Methodology">Methodology</a></li>
             <li><a href="/privacy" data-umami-event="Footer Link Click: Privacy">Privacy</a></li>
             <li><a href="/guides" data-umami-event="Footer Link Click: Guides">Guides</a></li>
             <li><a href="/tools" data-umami-event="Footer Link Click: Tools">Tool index</a></li>

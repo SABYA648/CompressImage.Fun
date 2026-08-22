@@ -28,6 +28,8 @@ The homepage owns `image compressor` and `compress image`. There is intentionall
 | `/watermark-image`                                                   | watermark image                 | Tool             | Self      | Add the user's text mark                                |
 | `/tools`                                                             | image tools                     | Index            | Self      | Search the registry                                     |
 | `/guides/*`                                                          | named educational question      | Article          | Self      | Understand a workflow and open a related tool           |
+| `/about`                                                             | about compressimage.fun         | Static Page      | Self      | Understand ownership, mission, and architecture         |
+| `/methodology/compression`                                           | compression methodology         | Static Page      | Self      | Understand exact-size search, codecs, and benchmarks    |
 | `/privacy`                                                           | compressimage.fun privacy       | Policy           | Self      | Understand upload and retention boundaries              |
 
 Each tool page owns one primary outcome and links only to a short related set. User jobs, API routes, previews, downloads, test routes, and internal docs are excluded from the sitemap and receive noindex response headers at the proxy.

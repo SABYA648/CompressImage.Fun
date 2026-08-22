@@ -3,64 +3,132 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 ---
 
 <SiteLayout
-  title="Privacy & Temporary File Processing | compressimage.fun"
-  description="Plain-language details about server processing, four-hour deletion, Delete now, browser-only Base64 tools, logs, and analytics."
+  title="Privacy Policy & Temporary File Processing | compressimage.fun"
+  description="Plain-language privacy policy detailing temporary server processing, four-hour automatic deletion, Delete now, browser-only tools, logs, and analytics."
   canonicalPath="/privacy"
 >
   <header class="hero compact">
     <div class="shell">
-      <div class="eyebrow">Plain-language privacy</div><h1>Your files are temporary</h1><p
-        class="lead"
-      >
-        Server tools need the image to do the work. Browser-only tools do not upload it. Here is the
-        exact boundary.
+      <div class="eyebrow">Plain-language privacy</div>
+      <h1>Your files are temporary and protected</h1>
+      <p class="lead">
+        Server tools process images temporarily and delete them promptly. Browser-only tools never
+        upload them. Here is our complete, verifiable privacy architecture.
       </p>
     </div>
   </header>
   <article class="article shell">
     <div class="article-body">
       <p class="article-summary">
-        Files processed on compressimage.fun servers are automatically deleted within four hours.
-        You can delete a completed job immediately.
+        Files processed on compressimage.fun servers are automatically purged within four hours.
+        You can delete completed jobs immediately. Browser-only tools never send your data to our
+        servers.
       </p>
+
       <section>
-        <h2>Server tools</h2><p>
-          Compression, resizing, cropping, format conversion, metadata tools, watermarks, and
-          favicon generation upload images to the same-origin processing API. Each temporary job
-          uses a cryptographically random ID and a separate high-entropy access token. Files are
-          stored under random internal names, not your filename.
-        </p><p>
-          The source, outputs, small private previews, and safe job metadata live in an isolated
-          processor volume. A cleanup task runs at startup and periodically. Delete now removes the
-          complete job directory immediately.
+        <h2>1. Server-processed tools</h2>
+        <p>
+          Image compression, exact-size targeting, format conversion, resizing, cropping, rotation,
+          metadata inspection/removal, watermark application, and favicon generation require native
+          codec processing and upload files to our same-origin processing API.
+        </p>
+        <p>
+          Every job is isolated with cryptographic security:
+        </p>
+        <ul>
+          <li><strong>Random identification:</strong> Each job receives a cryptographically random directory ID and an independent 256-bit capability access token. Only a SHA-256 hash of the token is stored on the server.</li>
+          <li><strong>Storage isolation:</strong> Uploaded source files, encoded outputs, and private preview thumbnails are stored in an isolated, private volume under random internal filenames, not your original filename.</li>
+          <li><strong>Automatic TTL deletion:</strong> All job directories and files are permanently deleted by an automated cleanup daemon within four hours (14,400 seconds) of creation. Cleanup also runs automatically upon processor startup.</li>
+          <li><strong>Immediate manual deletion:</strong> Clicking "Delete now" in the tool workspace sends a <code>DELETE</code> command that immediately and permanently removes the complete job directory and all associated files from disk.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>2. Browser-only tools</h2>
+        <p>
+          The following developer and document utilities run 100% inside your local browser memory
+          using client-side Web APIs (such as the HTML5 Canvas API, jsPDF, and typed arrays):
+        </p>
+        <ul>
+          <li>Image to Base64</li>
+          <li>Base64 to Image</li>
+          <li>Base64 Image Viewer</li>
+          <li>Image to Data URI</li>
+          <li>Image to PDF</li>
+          <li>Image Color Picker</li>
+        </ul>
+        <p>
+          When you use these tools, your images, pasted strings, and generated documents are never
+          uploaded or transmitted to our servers. Network tests in our automated release gate
+          strictly enforce this zero-network boundary.
         </p>
       </section>
+
       <section>
-        <h2>Browser tools</h2><p>
-          Image to Base64, Base64 to Image, Base64 Image Viewer, and Image to Data URI run in
-          browser memory. Their file or pasted value is not sent to the processing API. The tools
-          also set input limits to avoid freezing your tab.
+        <h2>3. Server logs and operational diagnostics</h2>
+        <p>
+          Our server operational logs are strictly limited to technical health and capacity monitoring.
+          Logs may record:
+        </p>
+        <ul>
+          <li>Request timestamp and internal request ID</li>
+          <li>Tool identifier and operation mode (e.g. <code>compress:exact</code>)</li>
+          <li>Input and output format (e.g. <code>jpeg</code>, <code>webp</code>)</li>
+          <li>Coarse file size bucket (e.g. <code>under-1mb</code>, <code>1mb-5mb</code>)</li>
+          <li>Processing duration in milliseconds and HTTP status code</li>
+          <li>Controlled error category codes (e.g. <code>UNSUPPORTED_FORMAT</code>, <code>TARGET_IMPOSSIBLE</code>)</li>
+        </ul>
+        <p>
+          Logs <strong>never</strong> contain image pixel data, Base64 strings, EXIF metadata, GPS
+          coordinates, access tokens, job result URLs, or full user filenames.
         </p>
       </section>
+
       <section>
-        <h2>Logs</h2><p>
-          Operational logs may contain a request ID, tool ID, format, coarse size bucket, duration,
-          and a controlled error category. They do not intentionally contain image bytes, Base64
-          data, GPS values, access tokens, result URLs, or full original filenames.
+        <h2>4. Analytics and telemetry disclosure</h2>
+        <p>
+          We use analytics to monitor site reliability, understand which tools are popular, and
+          improve performance across mobile and desktop devices.
+        </p>
+        <p>
+          Our analytics implementation operates under strict privacy safeguards:
+        </p>
+        <ul>
+          <li>
+            <strong>Google Analytics 4 (GA4):</strong> Configured with IP anonymization enforced and
+            advertising features (Google Signals and ad personalization) explicitly disabled.
+          </li>
+          <li>
+            <strong>Umami Analytics:</strong> A privacy-first, cookie-less analytics platform that
+            does not track users across websites or collect personal identifiers.
+          </li>
+          <li>
+            <strong>Semantic event boundaries:</strong> The event tracking layer passes only high-level
+            operational categories (such as tool name, general format, coarse file count, and general
+            success/error outcome). It never transmits filenames, image contents, EXIF tags, GPS
+            values, job IDs, bearer tokens, or free-form error messages.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>5. What metadata removal cannot do</h2>
+        <p>
+          Using our metadata removal tool strips EXIF tags, GPS coordinates, camera serial numbers,
+          and embedded thumbnail records from image headers.
+        </p>
+        <p>
+          However, removing metadata does not blur or alter the visible pixels. If an image contains
+          faces, house numbers, street signs, reflection details, or readable text on documents, that
+          visual information remains present in the image.
         </p>
       </section>
+
       <section>
-        <h2>Analytics</h2><p>
-          Analytics is off when no measurement ID is configured. If enabled later, the event layer
-          sends only controlled categories such as tool ID, format, file-count bucket, and
-          processing result. Filenames, image contents, EXIF, job IDs, access tokens, and free-form
-          errors are excluded.
-        </p>
-      </section>
-      <section>
-        <h2>What metadata removal cannot do</h2><p>
-          Removing EXIF and GPS fields does not hide information visible in the pixels. Faces,
-          signs, reflections, and document text may still reveal private details.
+        <h2>6. Third-party sharing and monetization</h2>
+        <p>
+          We do not sell, rent, monetize, or share your uploaded files, metadata, or browsing activity
+          with third-party advertisers, data brokers, or AI training registries.
         </p>
       </section>
     </div>

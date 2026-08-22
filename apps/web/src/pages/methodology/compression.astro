@@ -1,0 +1,148 @@
+---
+import SiteLayout from '../../layouts/SiteLayout.astro';
+---
+
+<SiteLayout
+  title="Compression Methodology & Exact-Size Engine | compressimage.fun"
+  description="Detailed technical breakdown of our bounded quality search, dimension scaling rules, codec benchmarks, and output validation engine."
+  canonicalPath="/methodology/compression"
+>
+  <header class="hero compact">
+    <div class="shell">
+      <div class="eyebrow">Technical methodology</div>
+      <h1>How our compression and exact-size engine works</h1>
+      <p class="lead">
+        A deep look at our bounded binary search algorithm, codec configurations, resolution fallback
+        heuristics, and output validation pipeline.
+      </p>
+    </div>
+  </header>
+  <article class="article shell">
+    <div class="article-body">
+      <p class="article-summary">
+        We believe compression tools should be transparent about their mechanics. Here is how
+        CompressImage.fun optimizes images to target byte limits while keeping quality tradeoffs
+        visible.
+      </p>
+
+      <section>
+        <h2>1. The exact-size search algorithm</h2>
+        <p>
+          Unlike naive compressors that guess a quality level from a slider or pad files with dummy
+          bytes, our exact-size engine executes a bounded, measured search to find the highest
+          possible visual quality that strictly satisfies your target limit.
+        </p>
+        <p>The optimization pipeline follows four deterministic phases:</p>
+        <ol>
+          <li>
+            <strong>Initial size check:</strong> If the uploaded image is already at or below the
+            requested byte target, the engine avoids unnecessary re-encoding and preserves the
+            original bytes.
+          </li>
+          <li>
+            <strong>Native-dimension binary search:</strong> The engine keeps 100% of the original
+            pixel dimensions and executes a binary search over codec quality parameters (bounded
+            between a configurable minimum, typically quality 35, and maximum quality 90). Each
+            candidate is encoded in memory and its byte size measured.
+          </li>
+          <li>
+            <strong>Controlled resolution step-down:</strong> If the candidate image exceeds the
+            target size even at the lowest acceptable quality threshold, the engine steps down
+            resolution progressively (e.g. 90%, 80%, 70%, 50% scale) and re-evaluates the quality
+            curve at each step. This preserves visual clarity better than crushing a full-resolution
+            grid into extreme quantization noise.
+          </li>
+          <li>
+            <strong>Strict verification pass:</strong> Every final output is decoded again by the
+            processing pipeline to verify that byte count is strictly less than or equal to the
+            target, dimensions match expectations, and the resulting file is structurally intact.
+          </li>
+        </ol>
+      </section>
+
+      <section>
+        <h2>2. Impossible target handling</h2>
+        <p>
+          Some combinations of image content and file size limits are mathematically or visually
+          impossible (for example, attempting to fit a complex 4K photograph with transparency into a
+          5 KB PNG).
+        </p>
+        <p>
+          Rather than silently degrading the image into an unrecognizable blur or returning a 500
+          server error, our engine detects when bounds cannot be met and returns a clean, actionable
+          <code>422 TARGET_IMPOSSIBLE</code> response with specific advice (such as converting to WebP/JPEG,
+          cropping whitespace, or raising the target limit).
+        </p>
+      </section>
+
+      <section>
+        <h2>3. Codec configurations and tuning</h2>
+        <p>
+          Our native processor builds on libvips and Sharp, utilizing optimized compilation flags
+          and conservative resource budgets:
+        </p>
+        <ul>
+          <li>
+            <strong>JPEG:</strong> Progressive scan enabled, mozjpeg quantization tables, standard
+            trellis quantization, and adaptive 4:2:0 chroma subsampling (with 4:4:4 preserved for high-detail
+            text and graphics).
+          </li>
+          <li>
+            <strong>PNG:</strong> Lossless optimization uses zlib level 9 compression with adaptive
+            row filtering. When lossy PNG compression is requested, 256-color palette quantization
+            with Floyd-Steinberg dithering is applied.
+          </li>
+          <li>
+            <strong>WebP:</strong> Encoded using libwebp with method 4 effort, combining high compression
+            efficiency with predictable processing latency. Alpha channels and animation metadata
+            are preserved where supported.
+          </li>
+          <li>
+            <strong>AVIF:</strong> Utilizes AV1 image encoding tuned to effort level 3. Measured on
+            photographic fixtures, effort level 3 provides over 95% of the compression efficiency of
+            effort level 4 while reducing encode time and CPU load by over 60%.
+          </li>
+          <li>
+            <strong>HEIC / HEIF:</strong> iPhone and modern mobile camera HEIC inputs are safely
+            decoded via an isolated libheif pipeline, normalizing orientation and color profiles
+            before encoding into your selected web format.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>4. Visual quality and perceptual measurement</h2>
+        <p>
+          Mathematical metrics such as Peak Signal-to-Noise Ratio (PSNR) and Structural Similarity
+          (SSIM) provide valuable guidance during automated testing, but they can fail to capture
+          human perceptual priorities (such as facial skin tones, high-contrast text legibility, and
+          ringing artifacts around sharp edges).
+        </p>
+        <p>
+          We benchmark our engine against an open-source test suite spanning multiple asset classes:
+        </p>
+        <ul>
+          <li><strong>Continuous-tone photographs:</strong> Natural landscapes, portraits, high dynamic range scenes.</li>
+          <li><strong>User interface & screenshots:</strong> Crisp text, single-pixel borders, solid background blocks.</li>
+          <li><strong>Alpha transparency:</strong> Logos, iconography, cut-out graphics with soft drop shadows.</li>
+          <li><strong>Form scans & signatures:</strong> Monochrome ink on paper, high contrast documents.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>5. Reproducible testing and benchmarks</h2>
+        <p>
+          All benchmark suites are checked into our repository and executed inside the production
+          Docker environment. Run the benchmark scripts directly to verify compression metrics
+          against your own hardware:
+        </p>
+        <pre><code>npm run benchmark:compression
+npm run benchmark:exact</code></pre>
+        <p>
+          Every release gate is verified against real file fixtures before deployment to ensure no
+          regressions in file size, processing speed, or output fidelity.
+        </p>
+      </section>
+    </div>
+  </article>
+</SiteLayout>

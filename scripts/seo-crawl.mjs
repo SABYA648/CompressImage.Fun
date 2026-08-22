@@ -10,6 +10,8 @@ const descriptions = new Set();
 const failures = [];
 const anchors = [
   '/',
+  '/about',
+  '/methodology/compression',
   '/compress-image-to-size',
   '/resize-image',
   '/convert-image',

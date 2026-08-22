@@ -1,13 +1,17 @@
 import { tools, toolPath } from '../data/tools';
 import { guides } from '../data/guides';
+
 export const prerender = true;
 const escape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
 export function GET() {
   const routes = [
     '/',
     '/tools',
     '/guides',
     '/privacy',
+    '/about',
+    '/methodology/compression',
     ...tools.filter((tool) => tool.slug).map(toolPath),
     ...guides.map((guide) => `/guides/${guide.slug}`),
   ];
