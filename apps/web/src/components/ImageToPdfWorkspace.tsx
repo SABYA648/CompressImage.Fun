@@ -9,6 +9,9 @@ interface PdfImage {
   id: string;
 }
 const paperSizes = { A4: [595.28, 841.89], Letter: [612, 792] } as const;
+const createLocalId = (): string =>
+  globalThis.crypto?.randomUUID?.() ??
+  `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 const readImage = (file: File): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {
@@ -83,7 +86,10 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
       ...accepted.map((file) => ({
         file,
         url: URL.createObjectURL(file),
-        id: crypto.randomUUID(),
+        // This key only manages local page order; it is not a security token.
+        // Keep the tool functional on production-like HTTP service hostnames
+        // where randomUUID may be unavailable outside a secure context.
+        id: createLocalId(),
       })),
     ]);
     setError(

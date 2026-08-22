@@ -1,41 +1,78 @@
 ---
 import SiteLayout from '../../layouts/SiteLayout.astro';
 import { guides } from '../../data/guides';
+import { toolById } from '../../data/tools';
 ---
 
 <SiteLayout
-  title="Image Compression & Format Guides | compressimage.fun"
-  description="Practical guides to image compression, exact file sizes, formats, metadata, dimensions, and Base64."
+  title="Image Compression, Resize & Format Guides | compressimage.fun"
+  description="Use practical image compression, resize, conversion, privacy, favicon, PDF, and Base64 guides with a working tool inside every article."
   canonicalPath="/guides"
 >
   <header class="hero compact">
     <div class="shell">
-      <div class="eyebrow">Practical image notes</div><h1>Understand the file, fix it faster</h1><p
-        class="lead"
-      >
-        Clear explanations grounded in how the tools actually process images.
+      <div class="eyebrow">{guides.length} practical image guides</div><h1>
+        Understand the file, fix it faster
+      </h1><p class="lead">
+        Clear answers grounded in real processing, with the right working tool inside every guide.
       </p>
     </div>
   </header>
   <section class="article-list shell">
+    <div class="guide-search">
+      <label for="guide-query">What image problem are you solving?</label>
+      <input
+        id="guide-query"
+        type="search"
+        placeholder="Try “passport”, “WebP”, “50 KB”, or “Base64”"
+        autocomplete="off"
+      />
+      <p id="guide-search-status" class="muted" aria-live="polite">
+        {guides.length} guides, each with a working tool
+      </p>
+    </div>
     <div class="guide-grid">
       {
-        guides.map((guide) => (
-          <a
-            class="guide-card"
-            href={`/guides/${guide.slug}`}
-            data-umami-event="Guide Card Click"
-            data-umami-event-guide={guide.slug}
-          >
-            <>
-              <small>{guide.readMinutes} minute read</small>
-              <h2>{guide.title}</h2>
-              <p>{guide.description}</p>
-              <strong>Read guide →</strong>
-            </>
-          </a>
-        ))
+        guides.map((guide) => {
+          const primaryTool = guide.relatedTools.map((id) => toolById.get(id)).find(Boolean);
+          return (
+            <a
+              class="guide-card"
+              href={`/guides/${guide.slug}`}
+              data-guide-search={`${guide.title} ${guide.description} ${guide.summary} ${primaryTool?.h1 ?? ''}`.toLowerCase()}
+              data-umami-event="Guide Card Click"
+              data-umami-event-guide={guide.slug}
+            >
+              <>
+                <small>
+                  {guide.readMinutes} minute read · Includes {primaryTool?.h1 ?? 'a working tool'}
+                </small>
+                <h2>{guide.title}</h2>
+                <p>{guide.description}</p>
+                <strong>Read and use the tool →</strong>
+              </>
+            </a>
+          );
+        })
       }
     </div>
   </section>
+  <script>
+    const query = document.querySelector<HTMLInputElement>('#guide-query');
+    const cards = [...document.querySelectorAll<HTMLElement>('[data-guide-search]')];
+    const status = document.querySelector<HTMLElement>('#guide-search-status');
+    query?.addEventListener('input', () => {
+      const value = query.value.trim().toLowerCase();
+      let visible = 0;
+      cards.forEach((card) => {
+        const match = !value || card.dataset.guideSearch?.includes(value);
+        card.hidden = !match;
+        if (match) visible += 1;
+      });
+      if (status)
+        status.textContent = value
+          ? `${visible} matching ${visible === 1 ? 'guide' : 'guides'}`
+          : `${cards.length} guides, each with a working tool`;
+    });
+  </script>
 </SiteLayout>

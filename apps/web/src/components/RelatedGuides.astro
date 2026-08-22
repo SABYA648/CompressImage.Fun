@@ -1,0 +1,39 @@
+---
+import { guidesForTool } from '../data/guides';
+import type { ToolDefinition } from '../data/tools';
+
+const { tool } = Astro.props as { tool: ToolDefinition };
+const stories = guidesForTool(tool, 5);
+---
+
+<section class="story-rail" aria-labelledby={`stories-${tool.id}`}>
+  <div class="shell">
+    <div class="section-heading story-heading">
+      <div>
+        <div class="eyebrow">Solve the whole problem</div>
+        <h2 id={`stories-${tool.id}`}>Useful guides for this tool</h2>
+      </div>
+      <a href="/guides" data-umami-event="All Guides Click">See every guide</a>
+    </div>
+    <div class="story-grid" data-story-count={stories.length}>
+      {
+        stories.map((guide, index) => (
+          <a
+            class="story-card"
+            href={`/guides/${guide.slug}`}
+            data-umami-event="Related Guide Click"
+            data-umami-event-guide={guide.slug}
+            data-umami-event-tool={tool.id}
+          >
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <h3>{guide.title}</h3>
+            <p>{guide.description}</p>
+            <strong>
+              Read and use the tool <b aria-hidden="true">↗</b>
+            </strong>
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</section>

@@ -3,7 +3,7 @@
  * Compact production-compose release smoke for compressimage.fun.
  * Run against a live web→processor stack (BASE_URL, default http://127.0.0.1:8080).
  */
-import { mkdir, readFile, writeFile, rm, access } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -19,6 +19,25 @@ const record = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+const waitForProcessorReady = async (timeoutMs = 60_000) => {
+  const started = Date.now();
+  let lastStatus = 'not reached';
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const response = await fetch(`${base}/ready`);
+      lastStatus = String(response.status);
+      if (response.ok) {
+        const body = await response.json();
+        if (body.status === 'ready') return;
+      }
+    } catch (error) {
+      lastStatus = error instanceof Error ? error.message : String(error);
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 500));
+  }
+  throw new Error(`processor did not become ready: ${lastStatus}`);
+};
+
 const waitJob = async (id, token, timeoutMs = 90_000) => {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
@@ -31,18 +50,6 @@ const waitJob = async (id, token, timeoutMs = 90_000) => {
     await new Promise((r) => setTimeout(r, 200));
   }
   throw new Error('job timeout');
-};
-
-const postJob = async (filePath, mime, filename, operation, toolId = 'release-smoke') => {
-  const bytes = await readFile(filePath);
-  const form = new FormData();
-  form.append('toolId', toolId);
-  form.append('operation', JSON.stringify(operation));
-  form.append('files', new Blob([bytes], { type: mime }), filename);
-  const created = await fetch(`${base}/api/jobs`, { method: 'POST', body: form });
-  const body = await created.json();
-  if (!created.ok) throw new Error(`create ${created.status}: ${JSON.stringify(body)}`);
-  return waitJob(body.id, body.token);
 };
 
 const outputOf = (job) => job.files.find((f) => f.role === 'output');
@@ -100,7 +107,7 @@ await sharp(
 await baseImg.clone().avif({ quality: 62, effort: 3 }).toFile(avif);
 
 try {
-  await run('heif-enc', ['-q', '85', '-o', heic, jpg]);
+  await run('heif-enc', ['-q', '85', '-p', 'x265:preset=ultrafast', '-o', heic, jpg]);
 } catch {
   // Fall back: encode inside processor image which has heif-enc + x265.
   await run('docker', [
@@ -118,12 +125,7 @@ try {
 try {
   await access(heic);
 } catch {
-  await run('docker', [
-    'compose',
-    'cp',
-    jpg,
-    'processor:/tmp/photograph.jpg',
-  ]);
+  await run('docker', ['compose', 'cp', jpg, 'processor:/tmp/photograph.jpg']);
   await run('docker', [
     'compose',
     'exec',
@@ -132,6 +134,8 @@ try {
     'heif-enc',
     '-q',
     '85',
+    '-p',
+    'x265:preset=ultrafast',
     '-o',
     '/tmp/photograph.heic',
     '/tmp/photograph.jpg',
@@ -152,7 +156,11 @@ try {
   ]);
   const hasConvert = whichOut.includes('heif-convert');
   const hasLibde265 = /libde265/i.test(whichOut);
-  record('HEIC packages + list-decoders', hasConvert && hasLibde265, whichOut.split('\n').slice(0, 8).join(' | '));
+  record(
+    'HEIC packages + list-decoders',
+    hasConvert && hasLibde265,
+    whichOut.split('\n').slice(0, 8).join(' | '),
+  );
 }
 
 // --- Health ---
@@ -167,7 +175,7 @@ try {
 
 // --- Core workflows ---
 {
-  const { out, buffer } = await createAndDownload(jpg, 'image/jpeg', 'photograph.jpg', {
+  const { buffer } = await createAndDownload(jpg, 'image/jpeg', 'photograph.jpg', {
     kind: 'compress',
     mode: 'smart',
     format: 'jpeg',
@@ -205,7 +213,11 @@ try {
     format: 'webp',
     quality: 80,
   });
-  record('WebP conversion', out.format === 'webp' && (await sharp(buffer).metadata()).format === 'webp', `${buffer.length} B`);
+  record(
+    'WebP conversion',
+    out.format === 'webp' && (await sharp(buffer).metadata()).format === 'webp',
+    `${buffer.length} B`,
+  );
 }
 
 {
@@ -218,7 +230,11 @@ try {
   const meta = await sharp(buffer).metadata();
   const elapsed = Date.now() - started;
   const isAvif = out.format === 'avif' && meta.format === 'heif' && meta.compression === 'av1';
-  record('JPEG → AVIF', isAvif && elapsed < 60_000, `${buffer.length} B in ${elapsed} ms, compression=${meta.compression}`);
+  record(
+    'JPEG → AVIF',
+    isAvif && elapsed < 60_000,
+    `${buffer.length} B in ${elapsed} ms, compression=${meta.compression}`,
+  );
 }
 
 {
@@ -229,7 +245,11 @@ try {
   });
   const meta = await sharp(buffer).metadata();
   const isAvif = out.format === 'avif' && meta.compression === 'av1';
-  record('AVIF preserve-format', isAvif, `out.format=${out.format}, compression=${meta.compression}, ${buffer.length} B`);
+  record(
+    'AVIF preserve-format',
+    isAvif,
+    `out.format=${out.format}, compression=${meta.compression}, ${buffer.length} B`,
+  );
 }
 
 {
@@ -269,7 +289,11 @@ try {
     format: 'webp',
     quality: 80,
   });
-  record('HEIC → WebP', out.format === 'webp' && (await sharp(buffer).metadata()).format === 'webp', `${buffer.length} B`);
+  record(
+    'HEIC → WebP',
+    out.format === 'webp' && (await sharp(buffer).metadata()).format === 'webp',
+    `${buffer.length} B`,
+  );
 }
 
 {
@@ -313,7 +337,7 @@ try {
 }
 
 {
-  const { out, buffer, headers } = await createAndDownload(jpg, 'image/jpeg', 'photograph.jpg', {
+  const { buffer, headers } = await createAndDownload(jpg, 'image/jpeg', 'photograph.jpg', {
     kind: 'metadata',
     action: 'remove',
     format: 'jpeg',
@@ -326,13 +350,14 @@ try {
   );
   record(
     'Download Cache-Control private no-store',
-    /private/i.test(headers.get('cache-control') ?? '') && /no-store/i.test(headers.get('cache-control') ?? ''),
+    /private/i.test(headers.get('cache-control') ?? '') &&
+      /no-store/i.test(headers.get('cache-control') ?? ''),
     headers.get('cache-control') ?? '',
   );
   record(
     'Download X-Robots-Tag via nginx /api/',
-    true, // checked separately on response headers below
-    'see security header block',
+    /noindex/i.test(headers.get('x-robots-tag') ?? ''),
+    headers.get('x-robots-tag') ?? '',
   );
 }
 
@@ -359,16 +384,7 @@ try {
     if (stdout.includes('"Health":"healthy"') || stdout.includes('healthy')) break;
     await new Promise((r) => setTimeout(r, 1000));
   }
-  // web may need a moment after processor restart
-  for (let i = 0; i < 30; i += 1) {
-    try {
-      const h = await fetch(`${base}/health`);
-      if (h.ok) break;
-    } catch {
-      /* retry */
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
+  await waitForProcessorReady();
 
   const afterJob = await fetch(`${base}/api/jobs/${body.id}`, {
     headers: { Authorization: `Bearer ${body.token}` },
@@ -409,13 +425,8 @@ try {
   );
 }
 
-// --- TTL smoke (temporary short TTL via one-off processor env is heavy; use store expiry path) ---
+// --- TTL smoke with a temporary processor override ---
 {
-  // Spin a short-TTL processor is invasive; instead create job then manually expire via FILE_TTL
-  // by running a one-shot with override is complex. Compact approach: set TTL on a disposable
-  // compose project is too heavy. Use docker compose run with FILE_TTL_SECONDS=15 against same volume.
-  // Safer compact smoke: plant expiry by updating mtime via touching expired metadata inside volume.
-  // Actually use a temporary compose override file.
   const ttlOverride = resolve(root, 'ttl.override.yml');
   // FILE_TTL_SECONDS minimum is 60 (apps/processor/src/config.ts).
   await writeFile(
@@ -434,69 +445,61 @@ try {
     '-d',
     'processor',
   ]);
-  for (let i = 0; i < 40; i += 1) {
-    const h = await fetch(`${base}/health`).catch(() => null);
-    if (h?.ok) break;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  const bytes = await readFile(jpg);
-  const form = new FormData();
-  form.append('toolId', 'ttl-smoke');
-  form.append('operation', JSON.stringify({ kind: 'compress', mode: 'smart', format: 'jpeg' }));
-  form.append('files', new Blob([bytes], { type: 'image/jpeg' }), 'ttl.jpg');
-  const created = await fetch(`${base}/api/jobs`, { method: 'POST', body: form });
-  const body = await created.json();
-  const job = await waitJob(body.id, body.token);
-  const out = outputOf(job);
-  const live = await fetch(`${base}/api/jobs/${body.id}/files/${out.id}/download`, {
-    headers: { Authorization: `Bearer ${body.token}` },
-  });
-  record('TTL pre-expiry download', live.ok, `status=${live.status}`);
-  await new Promise((r) => setTimeout(r, 65_000));
-  // Force startup cleanup of expired jobs.
-  await run('docker', ['compose', 'restart', 'processor']);
-  for (let i = 0; i < 40; i += 1) {
-    const h = await fetch(`${base}/health`).catch(() => null);
-    if (h?.ok) break;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  const expired = await fetch(`${base}/api/jobs/${body.id}`, {
-    headers: { Authorization: `Bearer ${body.token}` },
-  });
-  const expiredDl = await fetch(`${base}/api/jobs/${body.id}/files/${out.id}/download`, {
-    headers: { Authorization: `Bearer ${body.token}` },
-  });
-  const { stdout: dirCheck } = await run('docker', [
-    'compose',
-    'exec',
-    '-T',
-    'processor',
-    'bash',
-    '-lc',
-    `test ! -d /data/jobs/${body.id}; echo $?`,
-  ]);
-  record(
-    'TTL expiry',
-    (expired.status === 404 || expired.status === 410) &&
-      (expiredDl.status === 404 || expiredDl.status === 410) &&
-      dirCheck.trim() === '0',
-    `job=${expired.status}, dl=${expiredDl.status}, dirGone=${dirCheck.trim() === '0'}`,
-  );
-  // restore normal TTL
-  await run('docker', [
-    'compose',
-    '-f',
-    'docker-compose.yml',
-    '-f',
-    'docker-compose.local.yml',
-    'up',
-    '-d',
-    'processor',
-  ]);
-  for (let i = 0; i < 40; i += 1) {
-    const h = await fetch(`${base}/health`).catch(() => null);
-    if (h?.ok) break;
-    await new Promise((r) => setTimeout(r, 500));
+  try {
+    await waitForProcessorReady();
+    const bytes = await readFile(jpg);
+    const form = new FormData();
+    form.append('toolId', 'ttl-smoke');
+    form.append('operation', JSON.stringify({ kind: 'compress', mode: 'smart', format: 'jpeg' }));
+    form.append('files', new Blob([bytes], { type: 'image/jpeg' }), 'ttl.jpg');
+    const created = await fetch(`${base}/api/jobs`, { method: 'POST', body: form });
+    if (!created.ok) throw new Error(`TTL job creation failed with ${created.status}`);
+    const body = await created.json();
+    const job = await waitJob(body.id, body.token);
+    const out = outputOf(job);
+    const live = await fetch(`${base}/api/jobs/${body.id}/files/${out.id}/download`, {
+      headers: { Authorization: `Bearer ${body.token}` },
+    });
+    record('TTL pre-expiry download', live.ok, `status=${live.status}`);
+    await new Promise((r) => setTimeout(r, 65_000));
+    // Force startup cleanup of expired jobs.
+    await run('docker', ['compose', 'restart', 'processor']);
+    await waitForProcessorReady();
+    const expired = await fetch(`${base}/api/jobs/${body.id}`, {
+      headers: { Authorization: `Bearer ${body.token}` },
+    });
+    const expiredDl = await fetch(`${base}/api/jobs/${body.id}/files/${out.id}/download`, {
+      headers: { Authorization: `Bearer ${body.token}` },
+    });
+    const { stdout: dirCheck } = await run('docker', [
+      'compose',
+      'exec',
+      '-T',
+      'processor',
+      'bash',
+      '-lc',
+      `test ! -d /data/jobs/${body.id}; echo $?`,
+    ]);
+    record(
+      'TTL expiry',
+      (expired.status === 404 || expired.status === 410) &&
+        (expiredDl.status === 404 || expiredDl.status === 410) &&
+        dirCheck.trim() === '0',
+      `job=${expired.status}, dl=${expiredDl.status}, dirGone=${dirCheck.trim() === '0'}`,
+    );
+  } finally {
+    // Always restore the normal four-hour TTL, even when an assertion above throws.
+    await run('docker', [
+      'compose',
+      '-f',
+      'docker-compose.yml',
+      '-f',
+      'docker-compose.local.yml',
+      'up',
+      '-d',
+      'processor',
+    ]);
+    await waitForProcessorReady();
   }
 }
 
@@ -532,20 +535,30 @@ try {
     `robots=${api.headers.get('x-robots-tag')}, cache=${api.headers.get('cache-control')}`,
   );
 
-  // Processor must not be reachable from host
+  // Docker reports an internal exposed port as PublishedPort=0. Inspect the
+  // host binding map directly so that internal metadata is not mistaken for a
+  // real host listener.
   let processorExposed = false;
   try {
-    const { stdout } = await run('docker', [
-      'compose',
-      'port',
-      'processor',
-      '3000',
+    const { stdout: containerId } = await run('docker', ['compose', 'ps', '-q', 'processor']);
+    const { stdout: bindingsJson } = await run('docker', [
+      'inspect',
+      '--format',
+      '{{json .HostConfig.PortBindings}}',
+      containerId.trim(),
     ]);
-    processorExposed = Boolean(stdout.trim());
+    const bindings = JSON.parse(bindingsJson.trim() || '{}');
+    processorExposed = Object.values(bindings).some(
+      (binding) => Array.isArray(binding) && binding.length > 0,
+    );
   } catch {
-    processorExposed = false;
+    processorExposed = true;
   }
-  record('Processor has no published host port', !processorExposed, processorExposed ? 'EXPOSED' : 'private');
+  record(
+    'Processor has no published host port',
+    !processorExposed,
+    processorExposed ? 'EXPOSED' : 'private',
+  );
 }
 
 // --- SEO runtime ---

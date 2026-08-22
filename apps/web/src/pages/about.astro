@@ -32,51 +32,78 @@ import SiteLayout from '../layouts/SiteLayout.astro';
           while hiding how the compression happens, locking batch jobs behind paid subscriptions, or
           slapping watermarks on downloaded results.
         </p>
-        <p>
-          CompressImage.fun takes a different approach:
-        </p>
+        <p>CompressImage.fun takes a different approach:</p>
         <ul>
-          <li><strong>Exact size targeting:</strong> Set a real limit like 50 KB or 100 KB and let the engine search for the highest practical visual quality at or below that cap.</li>
-          <li><strong>Tradeoffs made visible:</strong> We preserve pixel dimensions first and reduce resolution only when necessary to meet an extreme byte target.</li>
-          <li><strong>Zero dark patterns:</strong> No user registration, no watermark injection, no artificial daily counters, and no spam ads.</li>
-          <li><strong>Format honesty:</strong> Native support for JPEG, PNG, WebP, AVIF, HEIC, TIFF, GIF, and SVG with clear explanations of codec capabilities and limitations.</li>
+          <li>
+            <strong>Exact size targeting:</strong> Set a real limit like 50 KB or 100 KB and let the engine
+            search for the highest practical visual quality at or below that cap.
+          </li>
+          <li>
+            <strong>Tradeoffs made visible:</strong> We preserve pixel dimensions first and reduce resolution
+            only when necessary to meet an extreme byte target.
+          </li>
+          <li>
+            <strong>Zero dark patterns:</strong> No user registration, no watermark injection, no artificial
+            daily counters, and no spam ads.
+          </li>
+          <li>
+            <strong>Format honesty:</strong> Native support for JPEG, PNG, WebP, AVIF, HEIC, TIFF, GIF,
+            and SVG with clear explanations of codec capabilities and limitations.
+          </li>
         </ul>
       </section>
 
       <section>
         <h2>Processing and privacy boundaries</h2>
         <p>
-          We maintain a strict technical separation between operations that require native image processing and utilities that run entirely inside your browser:
+          We maintain a strict technical separation between operations that require native image
+          processing and utilities that run entirely inside your browser:
         </p>
         <ul>
           <li>
-            <strong>Server-processed tools:</strong> Compression, exact-size targeting, format conversion, resizing, cropping, rotation, metadata stripping, and favicon generation run on our native processing service powered by Sharp and libvips. Files are held in isolated temporary storage under random identifiers with high-entropy bearer tokens, and are permanently purged automatically within four hours or immediately upon clicking "Delete now".
+            <strong>Server-processed tools:</strong> Compression, exact-size targeting, format conversion,
+            resizing, cropping, rotation, metadata stripping, and favicon generation run on our native
+            processing service powered by Sharp and libvips. Files are held in isolated temporary storage
+            under random identifiers with high-entropy bearer tokens, and are permanently purged automatically
+            within four hours or immediately upon clicking "Delete now".
           </li>
           <li>
-            <strong>Browser-only tools:</strong> Image to Base64, Base64 to Image, Base64 Viewer, Image to Data URI, Image to PDF, and Image Color Picker run entirely in local browser memory. No image data or strings are sent to our servers.
+            <strong>Browser-only tools:</strong> Image to Base64, Base64 to Image, Base64 Viewer, Image
+            to Data URI, Image to PDF, and Image Color Picker run entirely in local browser memory. No
+            image data or strings are sent to our servers.
           </li>
         </ul>
       </section>
 
       <section>
         <h2>Open architecture and stack</h2>
-        <p>
-          The site is engineered for performance, low memory footprint, and high reliability:
-        </p>
+        <p>The site is engineered for performance, low memory footprint, and high reliability:</p>
         <ul>
-          <li><strong>Frontend:</strong> Prerendered static Astro pages with lightweight Preact client hydration for interactive tool workspaces.</li>
-          <li><strong>Edge & Delivery:</strong> Nginx reverse proxy serving fingerprinted static assets with strict Content Security Policy (CSP), referrer policies, and caching headers.</li>
-          <li><strong>Native Engine:</strong> Fastify processing service executing bounded, queued libvips operations with memory caps, timeout protection, and output validation.</li>
+          <li>
+            <strong>Frontend:</strong> Prerendered static Astro pages with lightweight Preact client hydration
+            for interactive tool workspaces.
+          </li>
+          <li>
+            <strong>Edge & Delivery:</strong> Nginx reverse proxy serving fingerprinted static assets
+            with strict Content Security Policy (CSP), referrer policies, and caching headers.
+          </li>
+          <li>
+            <strong>Native Engine:</strong> Fastify processing service executing bounded, queued libvips
+            operations with memory caps, timeout protection, and output validation.
+          </li>
         </ul>
       </section>
 
       <section>
         <h2>Contact and corrections</h2>
         <p>
-          If you encounter an unexpected compression artifact, notice an inaccurate technical claim, or have suggestions for new features, we welcome your feedback.
+          If you encounter an unexpected compression artifact, notice an inaccurate technical claim,
+          or have suggestions for new features, we welcome your feedback.
         </p>
         <p>
-          Reach out through our open repository or contact our team directly at <a href="mailto:contact@compressimage.fun">contact@compressimage.fun</a>.
+          Reach out through our open repository or contact our team directly at <a
+            href="mailto:contact@compressimage.fun">contact@compressimage.fun</a
+          >.
         </p>
       </section>
     </div>

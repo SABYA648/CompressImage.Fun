@@ -33,6 +33,7 @@ export function GET() {
     '',
     '## Product Overview',
     'compressimage.fun is a free, fast, privacy-respecting image utility suite. No account signup, no watermarks, and no artificial daily limits.',
+    'Every educational guide gives the answer near the top and contains the relevant working tool on the same URL. Every tool page links to five distinct problem-solving guides.',
     '',
     '## Processing and Privacy Boundaries',
     '- Server-processed tools: Compression, exact-size targeting, format conversion, resizing, cropping, rotation, metadata stripping, and favicon generation upload files to a same-origin Fastify service powered by Sharp/libvips. Files are isolated under random directory IDs with 256-bit bearer tokens and are automatically deleted within 4 hours (or immediately with Delete now).',
@@ -45,16 +46,22 @@ export function GET() {
     '4. Form photo preparation: Custom pixel, DPI, background, and byte limits without false government compliance claims.',
     '',
     '## Main Tools',
-    ...selectedTools.map((tool) => `- [${tool.h1}](https://compressimage.fun${toolPath(tool)}): ${tool.description}`),
+    ...selectedTools.map(
+      (tool) => `- [${tool.h1}](https://compressimage.fun${toolPath(tool)}): ${tool.description}`,
+    ),
     '',
     '## Educational Guides',
-    ...guides.map((guide) => `- [${guide.title}](https://compressimage.fun/guides/${guide.slug}): ${guide.summary}`),
+    ...guides.map(
+      (guide) =>
+        `- [${guide.title}](https://compressimage.fun/guides/${guide.slug}): ${guide.summary}`,
+    ),
     '',
     '## Transparency, Methodology & Policies',
     '- [About Us](https://compressimage.fun/about)',
     '- [Compression Methodology](https://compressimage.fun/methodology/compression)',
     '- [Privacy Policy](https://compressimage.fun/privacy)',
     '- [Complete Tool Directory](https://compressimage.fun/tools)',
+    '- [Guide RSS Feed](https://compressimage.fun/guides/feed.xml)',
     '',
   ].join('\n');
 

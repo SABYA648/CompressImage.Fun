@@ -1,19 +1,57 @@
 ---
 import SiteLayout from '../layouts/SiteLayout.astro';
+import ToolEmbed from '../components/ToolEmbed.astro';
+import { toolById } from '../data/tools';
+
+const compressor = toolById.get('image-compressor')!;
 ---
 
 <SiteLayout
   title="Page not found | compressimage.fun"
-  description="The requested page could not be found."
+  description="The requested page could not be found. Compress an image here or return to the full tool directory."
   canonicalPath="/404"
+  noindex
 >
-  <section class="hero">
-    <div class="shell">
-      <div class="eyebrow">404</div><h1>That page got compressed out of existence</h1><p
-        class="lead"
-      >
-        The image tools are still right where they should be.
-      </p><p><a class="primary-button" href="/tools" data-umami-event="404 Browse Tools Click">Browse all tools</a></p>
+  <section class="error-hero">
+    <div class="shell error-layout">
+      <div class="error-copy">
+        <div class="eyebrow">Error 404 · useful anyway</div>
+        <h1>This page slipped out of frame</h1>
+        <p class="lead">
+          The missing URL is a dead end. This page is not. Compress an image below or jump to any
+          working tool.
+        </p>
+        <div class="error-actions">
+          <a class="primary-button" href="#quick-compressor" data-umami-event="404 Compress Click"
+            >Compress an image</a
+          >
+          <a class="secondary-button" href="/tools" data-umami-event="404 Browse Tools Click"
+            >Browse all tools</a
+          >
+        </div>
+      </div>
+      <div class="error-scene" aria-label="An animated image tile trying to find its frame">
+        <div class="error-orbit" aria-hidden="true"></div>
+        <div class="error-frame" aria-hidden="true"><span>?</span></div>
+        <div class="lost-tile" aria-hidden="true">
+          <i></i><b></b>
+        </div>
+        <span class="error-spark spark-one" aria-hidden="true"></span>
+        <span class="error-spark spark-two" aria-hidden="true"></span>
+        <span class="error-spark spark-three" aria-hidden="true"></span>
+      </div>
     </div>
+  </section>
+  <section id="quick-compressor" class="error-tool" aria-labelledby="quick-compressor-title">
+    <div class="shell error-tool-heading">
+      <div>
+        <div class="eyebrow">While you are here</div>
+        <h2 id="quick-compressor-title">Compress an image without leaving the 404</h2>
+      </div>
+      <p>
+        It is the full compressor, including batch, exact KB targets, downloads, and Delete now.
+      </p>
+    </div>
+    <ToolEmbed tool={compressor} eager />
   </section>
 </SiteLayout>

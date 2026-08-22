@@ -20,8 +20,8 @@ import SiteLayout from '../layouts/SiteLayout.astro';
   <article class="article shell">
     <div class="article-body">
       <p class="article-summary">
-        Files processed on compressimage.fun servers are automatically purged within four hours.
-        You can delete completed jobs immediately. Browser-only tools never send your data to our
+        Files processed on compressimage.fun servers are automatically purged within four hours. You
+        can delete completed jobs immediately. Browser-only tools never send your data to our
         servers.
       </p>
 
@@ -32,14 +32,28 @@ import SiteLayout from '../layouts/SiteLayout.astro';
           metadata inspection/removal, watermark application, and favicon generation require native
           codec processing and upload files to our same-origin processing API.
         </p>
-        <p>
-          Every job is isolated with cryptographic security:
-        </p>
+        <p>Every job is isolated with cryptographic security:</p>
         <ul>
-          <li><strong>Random identification:</strong> Each job receives a cryptographically random directory ID and an independent 256-bit capability access token. Only a SHA-256 hash of the token is stored on the server.</li>
-          <li><strong>Storage isolation:</strong> Uploaded source files, encoded outputs, and private preview thumbnails are stored in an isolated, private volume under random internal filenames, not your original filename.</li>
-          <li><strong>Automatic TTL deletion:</strong> All job directories and files are permanently deleted by an automated cleanup daemon within four hours (14,400 seconds) of creation. Cleanup also runs automatically upon processor startup.</li>
-          <li><strong>Immediate manual deletion:</strong> Clicking "Delete now" in the tool workspace sends a <code>DELETE</code> command that immediately and permanently removes the complete job directory and all associated files from disk.</li>
+          <li>
+            <strong>Random identification:</strong> Each job receives a cryptographically random directory
+            ID and an independent 256-bit capability access token. Only a SHA-256 hash of the token is
+            stored on the server.
+          </li>
+          <li>
+            <strong>Storage isolation:</strong> Uploaded source files, encoded outputs, and private preview
+            thumbnails are stored in an isolated, private volume under random internal filenames, not
+            your original filename.
+          </li>
+          <li>
+            <strong>Automatic TTL deletion:</strong> All job directories and files are permanently deleted
+            by an automated cleanup daemon within four hours (14,400 seconds) of creation. Cleanup also
+            runs automatically upon processor startup.
+          </li>
+          <li>
+            <strong>Immediate manual deletion:</strong> Clicking "Delete now" in the tool workspace sends
+            a <code>DELETE</code> command that immediately and permanently removes the complete job directory
+            and all associated files from disk.
+          </li>
         </ul>
       </section>
 
@@ -67,8 +81,8 @@ import SiteLayout from '../layouts/SiteLayout.astro';
       <section>
         <h2>3. Server logs and operational diagnostics</h2>
         <p>
-          Our server operational logs are strictly limited to technical health and capacity monitoring.
-          Logs may record:
+          Our server operational logs are strictly limited to technical health and capacity
+          monitoring. Logs may record:
         </p>
         <ul>
           <li>Request timestamp and internal request ID</li>
@@ -76,11 +90,15 @@ import SiteLayout from '../layouts/SiteLayout.astro';
           <li>Input and output format (e.g. <code>jpeg</code>, <code>webp</code>)</li>
           <li>Coarse file size bucket (e.g. <code>under-1mb</code>, <code>1mb-5mb</code>)</li>
           <li>Processing duration in milliseconds and HTTP status code</li>
-          <li>Controlled error category codes (e.g. <code>UNSUPPORTED_FORMAT</code>, <code>TARGET_IMPOSSIBLE</code>)</li>
+          <li>
+            Controlled error category codes (e.g. <code>UNSUPPORTED_FORMAT</code>, <code
+              >TARGET_IMPOSSIBLE</code
+            >)
+          </li>
         </ul>
         <p>
-          Logs <strong>never</strong> contain image pixel data, Base64 strings, EXIF metadata, GPS
-          coordinates, access tokens, job result URLs, or full user filenames.
+          Logs <strong>never</strong> contain image pixel data, Base64 strings, EXIF metadata, GPS coordinates,
+          access tokens, job result URLs, or full user filenames.
         </p>
       </section>
 
@@ -90,23 +108,21 @@ import SiteLayout from '../layouts/SiteLayout.astro';
           We use analytics to monitor site reliability, understand which tools are popular, and
           improve performance across mobile and desktop devices.
         </p>
-        <p>
-          Our analytics implementation operates under strict privacy safeguards:
-        </p>
+        <p>Our analytics implementation operates under strict privacy safeguards:</p>
         <ul>
           <li>
-            <strong>Google Analytics 4 (GA4):</strong> Configured with IP anonymization enforced and
-            advertising features (Google Signals and ad personalization) explicitly disabled.
+            <strong>Google Analytics 4 (GA4):</strong> Configured with IP anonymization enforced and advertising
+            features (Google Signals and ad personalization) explicitly disabled.
           </li>
           <li>
-            <strong>Umami Analytics:</strong> A privacy-first, cookie-less analytics platform that
-            does not track users across websites or collect personal identifiers.
+            <strong>Umami Analytics:</strong> A privacy-first, cookie-less analytics platform that does
+            not track users across websites or collect personal identifiers.
           </li>
           <li>
             <strong>Semantic event boundaries:</strong> The event tracking layer passes only high-level
             operational categories (such as tool name, general format, coarse file count, and general
-            success/error outcome). It never transmits filenames, image contents, EXIF tags, GPS
-            values, job IDs, bearer tokens, or free-form error messages.
+            success/error outcome). It never transmits filenames, image contents, EXIF tags, GPS values,
+            job IDs, bearer tokens, or free-form error messages.
           </li>
         </ul>
       </section>
@@ -119,16 +135,16 @@ import SiteLayout from '../layouts/SiteLayout.astro';
         </p>
         <p>
           However, removing metadata does not blur or alter the visible pixels. If an image contains
-          faces, house numbers, street signs, reflection details, or readable text on documents, that
-          visual information remains present in the image.
+          faces, house numbers, street signs, reflection details, or readable text on documents,
+          that visual information remains present in the image.
         </p>
       </section>
 
       <section>
         <h2>6. Third-party sharing and monetization</h2>
         <p>
-          We do not sell, rent, monetize, or share your uploaded files, metadata, or browsing activity
-          with third-party advertisers, data brokers, or AI training registries.
+          We do not sell, rent, monetize, or share your uploaded files, metadata, or browsing
+          activity with third-party advertisers, data brokers, or AI training registries.
         </p>
       </section>
     </div>

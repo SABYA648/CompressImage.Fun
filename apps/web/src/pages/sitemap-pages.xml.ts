@@ -15,6 +15,6 @@ export function GET() {
     ...tools.filter((tool) => tool.slug).map(toolPath),
     ...guides.map((guide) => `/guides/${guide.slug}`),
   ];
-  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${[...new Set(routes)].map((path) => `<url><loc>${escape(`https://compressimage.fun${path}`)}</loc></url>`).join('')}</urlset>`;
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${[...new Set(routes)].map((path) => `<url><loc>${escape(`https://compressimage.fun${path}`)}</loc><lastmod>2026-08-23</lastmod></url>`).join('')}</urlset>`;
   return new Response(body, { headers: { 'Content-Type': 'application/xml' } });
 }

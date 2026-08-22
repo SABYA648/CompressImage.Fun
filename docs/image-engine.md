@@ -9,7 +9,7 @@ Uploads stream to disk and pass through byte limits, magic-byte detection, Sharp
 - JPEG: progressive, optimized coding, 4:2:0 chroma, default quality 82
 - PNG: compression level 9, adaptive filtering, palette only when requested by quality mode
 - WebP: effort 5, smart subsampling, default quality 80
-- AVIF: effort 4, 4:4:4 chroma, default quality 50
+- AVIF: effort 3, 4:4:4 chroma, default quality 50
 
 Metadata is stripped unless the operation explicitly requests preservation. Alpha is kept in PNG, WebP, and AVIF. JPEG conversion flattens alpha onto a selected background, white by default.
 

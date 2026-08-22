@@ -23,7 +23,7 @@ for (const input of inputs) {
           ? pipeline.png({ compressionLevel: 9, palette: input.includes('illustration') })
           : format === 'webp'
             ? pipeline.webp({ quality: 80, effort: 5 })
-            : pipeline.avif({ quality: 50, effort: 4 });
+            : pipeline.avif({ quality: 50, effort: 3 });
     const buffer = await pipeline.toBuffer();
     results.push({
       fixture: input,

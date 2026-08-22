@@ -8,6 +8,8 @@ interface Props {
   canonicalPath?: string;
   pageType?: 'tool' | 'article' | 'page';
   h1?: string;
+  noindex?: boolean;
+  updatedAt?: string;
 }
 
 const {
@@ -16,56 +18,112 @@ const {
   canonicalPath = Astro.url.pathname,
   pageType = 'page',
   h1,
+  noindex = false,
+  updatedAt,
 } = Astro.props;
 const canonical = new URL(canonicalPath || '/', 'https://compressimage.fun').toString();
 const verificationGoogle = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION;
 const verificationBing = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
 const gaId = String(import.meta.env.PUBLIC_GA_MEASUREMENT_ID ?? '').trim();
 const safeGaId = /^G-[A-Z0-9]+$/i.test(gaId) ? gaId.toUpperCase() : undefined;
+const gaBootstrap = safeGaId
+  ? `window.dataLayer=window.dataLayer||[];window.gtag=(...args)=>window.dataLayer.push(args);window.gtag('js',new Date());window.gtag('config',${JSON.stringify(safeGaId)},{anonymize_ip:true,allow_google_signals:false});`
+  : undefined;
 const popular = tools.filter((tool) => tool.popular).slice(0, 5);
+const robots = noindex
+  ? 'noindex, follow, noarchive'
+  : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+const organization = {
+  '@type': 'Organization',
+  '@id': 'https://compressimage.fun/#organization',
+  name: 'compressimage.fun',
+  url: 'https://compressimage.fun/',
+};
+const pageGraph: Record<string, unknown>[] = [
+  {
+    '@type': 'WebSite',
+    '@id': 'https://compressimage.fun/#website',
+    url: 'https://compressimage.fun/',
+    name: 'compressimage.fun',
+    description:
+      'Free image compression, exact-size targeting, and conversion tools without signup or watermarks.',
+  },
+  organization,
+];
+if (pageType === 'tool') {
+  pageGraph.push({
+    '@type': 'WebApplication',
+    name: h1 ?? title,
+    url: canonical,
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'All',
+    browserRequirements: 'Requires a modern web browser',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    description,
+    featureList:
+      'Exact KB/MB targeting, quality-first optimization, batch processing, zero watermark, 4-hour automatic file deletion',
+  });
+  if (canonical !== 'https://compressimage.fun/') {
+    pageGraph.push({
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        {
+          '@type': 'ListItem',
+          position: 1,
+          name: 'Home',
+          item: 'https://compressimage.fun/',
+        },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Tools',
+          item: 'https://compressimage.fun/tools',
+        },
+        { '@type': 'ListItem', position: 3, name: h1 ?? title, item: canonical },
+      ],
+    });
+  }
+}
 const schema =
   pageType === 'article'
     ? {
         '@context': 'https://schema.org',
-        '@type': 'Article',
-        headline: h1 ?? title,
-        description,
-        mainEntityOfPage: canonical,
-        inLanguage: 'en-US',
-        publisher: {
-          '@type': 'Organization',
-          name: 'compressimage.fun',
-          url: 'https://compressimage.fun/',
-        },
+        '@graph': [
+          organization,
+          {
+            '@type': 'Article',
+            headline: h1 ?? title,
+            description,
+            mainEntityOfPage: canonical,
+            url: canonical,
+            inLanguage: 'en-US',
+            publisher: { '@id': 'https://compressimage.fun/#organization' },
+            author: { '@id': 'https://compressimage.fun/#organization' },
+            ...(updatedAt ? { dateModified: updatedAt } : {}),
+          },
+          {
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              {
+                '@type': 'ListItem',
+                position: 1,
+                name: 'Home',
+                item: 'https://compressimage.fun/',
+              },
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: 'Guides',
+                item: 'https://compressimage.fun/guides',
+              },
+              { '@type': 'ListItem', position: 3, name: h1 ?? title, item: canonical },
+            ],
+          },
+        ],
       }
     : {
         '@context': 'https://schema.org',
-        '@graph': [
-          {
-            '@type': 'WebSite',
-            '@id': 'https://compressimage.fun/#website',
-            url: 'https://compressimage.fun/',
-            name: 'compressimage.fun',
-            description:
-              'Free image compression, exact-size targeting, and conversion tools without signup or watermarks.',
-          },
-          ...(pageType === 'tool'
-            ? [
-                {
-                  '@type': 'WebApplication',
-                  name: h1 ?? title,
-                  url: canonical,
-                  applicationCategory: 'MultimediaApplication',
-                  operatingSystem: 'All',
-                  browserRequirements: 'Requires a modern web browser',
-                  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-                  description,
-                  featureList:
-                    'Exact KB/MB targeting, quality-first optimization, batch processing, zero watermark, 4-hour automatic file deletion',
-                },
-              ]
-            : []),
-        ],
+        '@graph': pageGraph,
       };
 ---
 
@@ -77,7 +135,17 @@ const schema =
     <meta name="theme-color" content="#fffdf8" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="robots" content={robots} />
+    <meta name="googlebot" content={robots} />
+    <meta name="author" content="compressimage.fun" />
     <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="text/plain" href="https://compressimage.fun/llms.txt" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="compressimage.fun image guides"
+      href="https://compressimage.fun/guides/feed.xml"
+    />
     <!-- Declaring icons stops the browser requesting /favicon.ico and logging a 404. -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
@@ -104,15 +172,8 @@ const schema =
     {
       safeGaId && (
         <>
-          <script async src={`https://www.googletagmanager.com/gtag/js?id=${safeGaId}`} />
-          <script is:inline define:vars={{ gaId: safeGaId }}>
-            window.dataLayer = window.dataLayer || [];
-            function gtag() {
-              dataLayer.push(arguments);
-            }
-            gtag('js', new Date());
-            gtag('config', gaId, { anonymize_ip: true, allow_google_signals: false });
-          </script>
+          <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${safeGaId}`} />
+          <script is:inline set:html={gaBootstrap} />
         </>
       )
     }
@@ -120,14 +181,20 @@ const schema =
       is:inline
       defer
       src="https://analytics.sabya.pm/script.js"
-      data-website-id="81d738e7-a725-4c3c-aac3-c6fde9c735ad"
-    ></script>
+      data-website-id="81d738e7-a725-4c3c-aac3-c6fde9c735ad"></script>
   </head>
-  <body>
-    <a class="skip-link" href="#main" data-umami-event="Skip to Main Content">Skip to main content</a>
+  <body data-page-type={pageType}>
+    <a class="skip-link" href="#main" data-umami-event="Skip to Main Content"
+      >Skip to main content</a
+    >
     <header class="site-header">
       <div class="shell header-inner">
-        <a class="brand" href="/" aria-label="compressimage.fun home" data-umami-event="Header Brand Click">
+        <a
+          class="brand"
+          href="/"
+          aria-label="compressimage.fun home"
+          data-umami-event="Header Brand Click"
+        >
           <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
           <span>compressimage<span>.fun</span></span>
         </a>
@@ -138,6 +205,7 @@ const schema =
           <a href="/about" data-umami-event="Nav Click: About">About</a>
           <a href="/privacy" data-umami-event="Nav Click: Privacy">Privacy</a>
         </nav>
+        <a class="header-cta" href="/" data-umami-event="Header Compress Click">Compress now</a>
       </div>
     </header>
     <!-- tabindex allows the skip link to move focus here, not just scroll the page. -->
@@ -145,7 +213,9 @@ const schema =
     <footer class="site-footer">
       <div class="shell footer-grid">
         <div>
-          <a class="brand footer-brand" href="/" data-umami-event="Footer Brand Click">compressimage<span>.fun</span></a>
+          <a class="brand footer-brand" href="/" data-umami-event="Footer Brand Click"
+            >compressimage<span>.fun</span></a
+          >
           <p>Drop an image. Get exactly what you need.</p>
           <p class="muted">No account, no watermark, no artificial daily limit.</p>
         </div>
@@ -155,7 +225,13 @@ const schema =
             {
               popular.map((tool) => (
                 <li>
-                  <a href={toolPath(tool)} data-umami-event="Footer Popular Tool Click" data-umami-event-tool={tool.id}>{tool.h1}</a>
+                  <a
+                    href={toolPath(tool)}
+                    data-umami-event="Footer Popular Tool Click"
+                    data-umami-event-tool={tool.id}
+                  >
+                    {tool.h1}
+                  </a>
                 </li>
               ))
             }
@@ -165,7 +241,11 @@ const schema =
           <h2>Project</h2>
           <ul>
             <li><a href="/about" data-umami-event="Footer Link Click: About">About</a></li>
-            <li><a href="/methodology/compression" data-umami-event="Footer Link Click: Methodology">Methodology</a></li>
+            <li>
+              <a href="/methodology/compression" data-umami-event="Footer Link Click: Methodology"
+                >Methodology</a
+              >
+            </li>
             <li><a href="/privacy" data-umami-event="Footer Link Click: Privacy">Privacy</a></li>
             <li><a href="/guides" data-umami-event="Footer Link Click: Guides">Guides</a></li>
             <li><a href="/tools" data-umami-event="Footer Link Click: Tools">Tool index</a></li>

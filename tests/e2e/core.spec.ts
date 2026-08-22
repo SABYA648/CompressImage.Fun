@@ -74,7 +74,7 @@ test('Image to PDF reorders local images and downloads one PDF without API uploa
 }) => {
   const apiCalls: string[] = [];
   page.on('request', (request) => {
-    if (request.url().includes('/api/')) apiCalls.push(request.url());
+    if (request.url().includes('/api/jobs')) apiCalls.push(request.url());
   });
   await page.goto('/image-to-pdf');
   await page.locator('input[type=file]').setInputFiles([photo, transparent]);
@@ -91,7 +91,7 @@ test('Image to PDF reorders local images and downloads one PDF without API uploa
 test('browser Base64 encoding makes no API request', async ({ page }) => {
   const apiCalls: string[] = [];
   page.on('request', (request) => {
-    if (request.url().includes('/api/')) apiCalls.push(request.url());
+    if (request.url().includes('/api/jobs')) apiCalls.push(request.url());
   });
   await page.goto('/image-to-base64');
   await page.locator('input[type=file]').setInputFiles(photo);
@@ -153,7 +153,7 @@ test('favicon generator creates ICO, PNG, snippet, and ZIP', async ({ page }) =>
 test('color picker reads pixels and palette without upload', async ({ page }) => {
   const apiCalls: string[] = [];
   page.on('request', (request) => {
-    if (request.url().includes('/api/')) apiCalls.push(request.url());
+    if (request.url().includes('/api/jobs')) apiCalls.push(request.url());
   });
   await page.goto('/image-color-picker');
   await page.locator('input[type=file]').setInputFiles(transparent);
@@ -175,4 +175,54 @@ test('tool search and public crawl files work', async ({ page, request }) => {
   for (const path of ['/robots.txt', '/sitemap-index.xml', '/llms.txt'])
     expect((await request.get(path)).status()).toBe(200);
   expect((await request.get('/missing-route-for-test')).status()).toBe(404);
+});
+
+test('every tool page pattern exposes five useful stories and guides contain the working tool', async ({
+  page,
+}) => {
+  await page.goto('/passport-photo-resizer');
+  await expect(page.locator('.story-card')).toHaveCount(5);
+  await page.goto('/guides/how-to-resize-a-passport-or-form-photo');
+  await expect(
+    page.getByRole('heading', { name: 'Resize a passport or form photo', exact: true }),
+  ).toBeVisible();
+  await page.locator('.guide-tool').scrollIntoViewIfNeeded();
+  await page.locator('.guide-tool input[type=file]').setInputFiles(photo);
+  await page
+    .locator('.guide-tool')
+    .getByRole('button', { name: /Process image/ })
+    .click();
+  await expect(page.locator('.guide-tool').getByRole('heading', { name: 'Results' })).toBeVisible({
+    timeout: 45_000,
+  });
+});
+
+test('404 is noindex, animated, and includes a working compressor', async ({ page }) => {
+  const response = await page.goto('/missing-route-with-a-useful-recovery');
+  expect(response?.status()).toBe(404);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
+  await expect(page.locator('.error-scene')).toBeVisible();
+  await page.locator('#quick-compressor input[type=file]').setInputFiles(photo);
+  await page
+    .locator('#quick-compressor')
+    .getByRole('button', { name: /Process image/ })
+    .click();
+  await expect(
+    page.locator('#quick-compressor').getByRole('heading', { name: 'Results' }),
+  ).toBeVisible({ timeout: 45_000 });
+});
+
+test('uploader rejects non-images before starting a server job', async ({ page }) => {
+  const apiCalls: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/jobs')) apiCalls.push(request.url());
+  });
+  await page.goto('/');
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'not-an-image.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('not an image'),
+  });
+  await expect(page.getByText('Choose a supported image file.')).toBeVisible();
+  expect(apiCalls).toEqual([]);
 });

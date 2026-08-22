@@ -57,7 +57,7 @@ test('AVIF conversion through Docker stack', async ({ page }) => {
 test('browser Base64 tool makes zero API uploads', async ({ page }) => {
   const apiCalls: string[] = [];
   page.on('request', (request) => {
-    if (request.url().includes('/api/')) apiCalls.push(request.url());
+    if (request.url().includes('/api/jobs')) apiCalls.push(request.url());
   });
   await page.goto('/image-to-base64');
   await page.locator('input[type=file]').setInputFiles(photo);

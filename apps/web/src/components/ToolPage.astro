@@ -5,6 +5,7 @@ import ColorPickerWorkspace from './ColorPickerWorkspace';
 import Breadcrumbs from './Breadcrumbs.astro';
 import ImageToPdfWorkspace from './ImageToPdfWorkspace';
 import RelatedTools from './RelatedTools.astro';
+import RelatedGuides from './RelatedGuides.astro';
 import ToolWorkspace from './ToolWorkspace';
 
 const { tool, home = false } = Astro.props as { tool: ToolDefinition; home?: boolean };
@@ -13,16 +14,37 @@ const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'col
 ---
 
 {!home && <Breadcrumbs items={[{ label: 'Tools', href: '/tools' }, { label: tool.h1 }]} />}
-<header class:list={['hero', { compact: !home }]}>
-  <div class="shell">
-    <div class="eyebrow">{tool.category} · Free, no signup</div>
-    <h1>{tool.h1}</h1>
-    <p class="lead">{tool.lead}</p>
-    <ul class="trust-row" aria-label="Product promises">
-      <li>No watermark</li>
-      <li>{localTool ? 'Stays in your browser' : 'Delete immediately'}</li>
-      <li>Real quality controls</li>
-    </ul>
+<header class:list={['hero', 'tool-hero', { compact: !home, 'home-hero': home }]}>
+  <div class:list={['shell', { 'hero-layout': home }]}>
+    <div class="hero-copy">
+      <div class="eyebrow">{tool.category} · Free, no signup</div>
+      <h1>{tool.h1}</h1>
+      <p class="lead">{tool.lead}</p>
+      <ul class="trust-row" aria-label="Product promises">
+        <li>No watermark</li>
+        <li>{localTool ? 'Stays in your browser' : 'Delete immediately'}</li>
+        <li>Real quality controls</li>
+      </ul>
+    </div>
+    {
+      home && (
+        <figure class="hero-art" aria-label="Images passing through a compression portal">
+          <div class="hero-art-halo" aria-hidden="true" />
+          <img
+            src="/illustrations/image-orbit-hero.webp"
+            width="1024"
+            height="683"
+            alt="Colorful image cards becoming smaller as they pass through a compression portal"
+            fetchpriority="high"
+            decoding="async"
+          />
+          <figcaption>
+            <span>MEASURED OUTPUT</span>
+            <strong>Bytes down. Detail intact.</strong>
+          </figcaption>
+        </figure>
+      )
+    }
   </div>
 </header>
 
@@ -118,4 +140,5 @@ const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'col
   )
 }
 
+<RelatedGuides tool={tool} />
 <RelatedTools ids={tool.related} />

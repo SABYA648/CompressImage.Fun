@@ -1,0 +1,36 @@
+---
+import type { ToolDefinition } from '../data/tools';
+import Base64Workspace from './Base64Workspace';
+import ColorPickerWorkspace from './ColorPickerWorkspace';
+import ImageToPdfWorkspace from './ImageToPdfWorkspace';
+import ToolWorkspace from './ToolWorkspace';
+
+const { tool, eager = false } = Astro.props as { tool: ToolDefinition; eager?: boolean };
+const browserOnly = ['base64-encode', 'base64-decode', 'base64-viewer'].includes(tool.kind);
+---
+
+{
+  tool.kind === 'image-pdf' ? (
+    eager ? (
+      <ImageToPdfWorkspace tool={tool} client:load />
+    ) : (
+      <ImageToPdfWorkspace tool={tool} client:visible />
+    )
+  ) : tool.kind === 'color-picker' ? (
+    eager ? (
+      <ColorPickerWorkspace tool={tool} client:load />
+    ) : (
+      <ColorPickerWorkspace tool={tool} client:visible />
+    )
+  ) : browserOnly ? (
+    eager ? (
+      <Base64Workspace tool={tool} client:load />
+    ) : (
+      <Base64Workspace tool={tool} client:visible />
+    )
+  ) : eager ? (
+    <ToolWorkspace tool={tool} client:load />
+  ) : (
+    <ToolWorkspace tool={tool} client:visible />
+  )
+}

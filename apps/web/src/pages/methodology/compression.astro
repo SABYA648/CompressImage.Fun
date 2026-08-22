@@ -12,8 +12,8 @@ import SiteLayout from '../../layouts/SiteLayout.astro';
       <div class="eyebrow">Technical methodology</div>
       <h1>How our compression and exact-size engine works</h1>
       <p class="lead">
-        A deep look at our bounded binary search algorithm, codec configurations, resolution fallback
-        heuristics, and output validation pipeline.
+        A deep look at our bounded binary search algorithm, codec configurations, resolution
+        fallback heuristics, and output validation pipeline.
       </p>
     </div>
   </header>
@@ -35,27 +35,25 @@ import SiteLayout from '../../layouts/SiteLayout.astro';
         <p>The optimization pipeline follows four deterministic phases:</p>
         <ol>
           <li>
-            <strong>Initial size check:</strong> If the uploaded image is already at or below the
-            requested byte target, the engine avoids unnecessary re-encoding and preserves the
-            original bytes.
+            <strong>Initial size check:</strong> If the uploaded image is already at or below the requested
+            byte target, the engine avoids unnecessary re-encoding and preserves the original bytes.
           </li>
           <li>
-            <strong>Native-dimension binary search:</strong> The engine keeps 100% of the original
-            pixel dimensions and executes a binary search over codec quality parameters (bounded
-            between a configurable minimum, typically quality 35, and maximum quality 90). Each
-            candidate is encoded in memory and its byte size measured.
+            <strong>Native-dimension binary search:</strong> The engine keeps 100% of the original pixel
+            dimensions and executes a binary search over codec quality parameters (bounded between a configurable
+            minimum, typically quality 35, and maximum quality 90). Each candidate is encoded in memory
+            and its byte size measured.
           </li>
           <li>
-            <strong>Controlled resolution step-down:</strong> If the candidate image exceeds the
-            target size even at the lowest acceptable quality threshold, the engine steps down
-            resolution progressively (e.g. 90%, 80%, 70%, 50% scale) and re-evaluates the quality
-            curve at each step. This preserves visual clarity better than crushing a full-resolution
-            grid into extreme quantization noise.
+            <strong>Controlled resolution step-down:</strong> If the candidate image exceeds the target
+            size even at the lowest acceptable quality threshold, the engine steps down resolution progressively
+            (e.g. 90%, 80%, 70%, 50% scale) and re-evaluates the quality curve at each step. This preserves
+            visual clarity better than crushing a full-resolution grid into extreme quantization noise.
           </li>
           <li>
-            <strong>Strict verification pass:</strong> Every final output is decoded again by the
-            processing pipeline to verify that byte count is strictly less than or equal to the
-            target, dimensions match expectations, and the resulting file is structurally intact.
+            <strong>Strict verification pass:</strong> Every final output is decoded again by the processing
+            pipeline to verify that byte count is strictly less than or equal to the target, dimensions
+            match expectations, and the resulting file is structurally intact.
           </li>
         </ol>
       </section>
@@ -64,8 +62,8 @@ import SiteLayout from '../../layouts/SiteLayout.astro';
         <h2>2. Impossible target handling</h2>
         <p>
           Some combinations of image content and file size limits are mathematically or visually
-          impossible (for example, attempting to fit a complex 4K photograph with transparency into a
-          5 KB PNG).
+          impossible (for example, attempting to fit a complex 4K photograph with transparency into
+          a 5 KB PNG).
         </p>
         <p>
           Rather than silently degrading the image into an unrecognizable blur or returning a 500
@@ -83,29 +81,29 @@ import SiteLayout from '../../layouts/SiteLayout.astro';
         </p>
         <ul>
           <li>
-            <strong>JPEG:</strong> Progressive scan enabled, mozjpeg quantization tables, standard
-            trellis quantization, and adaptive 4:2:0 chroma subsampling (with 4:4:4 preserved for high-detail
-            text and graphics).
+            <strong>JPEG:</strong> Progressive output, optimized Huffman coding, fixed 4:2:0 chroma subsampling,
+            and a default quality of 82 through Sharp and libvips.
           </li>
           <li>
-            <strong>PNG:</strong> Lossless optimization uses zlib level 9 compression with adaptive
-            row filtering. When lossy PNG compression is requested, 256-color palette quantization
-            with Floyd-Steinberg dithering is applied.
+            <strong>PNG:</strong> Lossless optimization uses zlib level 9 compression with adaptive row
+            filtering. Lower quality requests enable a palette with codec-controlled quantization, while
+            lossless mode keeps the full decoded color values.
           </li>
           <li>
-            <strong>WebP:</strong> Encoded using libwebp with method 4 effort, combining high compression
-            efficiency with predictable processing latency. Alpha channels and animation metadata
-            are preserved where supported.
+            <strong>WebP:</strong> Encoded using libwebp with effort 5, combining high compression efficiency
+            with predictable processing latency. Alpha channels and animation metadata are preserved for
+            supported static inputs.
           </li>
           <li>
-            <strong>AVIF:</strong> Utilizes AV1 image encoding tuned to effort level 3. Measured on
-            photographic fixtures, effort level 3 provides over 95% of the compression efficiency of
-            effort level 4 while reducing encode time and CPU load by over 60%.
+            <strong>AVIF:</strong> Uses AV1 image encoding at effort 3 and 4:4:4 chroma. On the deterministic
+            photographic release fixture, effort 3 produced a smaller result in about 2.1 seconds, while
+            effort 4 took about 9.8 seconds and produced more bytes. Those numbers describe this fixture
+            and revision, not every photograph.
           </li>
           <li>
-            <strong>HEIC / HEIF:</strong> iPhone and modern mobile camera HEIC inputs are safely
-            decoded via an isolated libheif pipeline, normalizing orientation and color profiles
-            before encoding into your selected web format.
+            <strong>HEIC / HEIF:</strong> iPhone and modern mobile camera HEIC inputs are safely decoded
+            via an isolated libheif pipeline, normalizing orientation and color profiles before encoding
+            into your selected web format.
           </li>
         </ul>
       </section>
@@ -122,10 +120,20 @@ import SiteLayout from '../../layouts/SiteLayout.astro';
           We benchmark our engine against an open-source test suite spanning multiple asset classes:
         </p>
         <ul>
-          <li><strong>Continuous-tone photographs:</strong> Natural landscapes, portraits, high dynamic range scenes.</li>
-          <li><strong>User interface & screenshots:</strong> Crisp text, single-pixel borders, solid background blocks.</li>
-          <li><strong>Alpha transparency:</strong> Logos, iconography, cut-out graphics with soft drop shadows.</li>
-          <li><strong>Form scans & signatures:</strong> Monochrome ink on paper, high contrast documents.</li>
+          <li>
+            <strong>Continuous-tone photographs:</strong> Natural landscapes, portraits, high dynamic
+            range scenes.
+          </li>
+          <li>
+            <strong>User interface & screenshots:</strong> Crisp text, single-pixel borders, solid background
+            blocks.
+          </li>
+          <li>
+            <strong>Alpha transparency:</strong> Logos, iconography, cut-out graphics with soft drop shadows.
+          </li>
+          <li>
+            <strong>Form scans & signatures:</strong> Monochrome ink on paper, high contrast documents.
+          </li>
         </ul>
       </section>
 

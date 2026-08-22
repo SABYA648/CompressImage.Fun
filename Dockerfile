@@ -58,10 +58,20 @@ CMD ["node", "apps/processor/dist/server.js"]
 
 FROM mcr.microsoft.com/playwright:v1.62.1-noble AS e2e
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends libheif-examples && rm -rf /var/lib/apt/lists/*
+# The QA image owns the complete local release gate. Docker CLI + Compose let
+# the smoke harness verify restarts, persisted jobs, port isolation, and a
+# disposable short-TTL configuration through the host Docker socket. These
+# packages never enter either production image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libheif-examples libheif-plugin-x265 docker.io docker-compose-v2 \
+    && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/processor/package.json apps/processor/package.json
 RUN npm ci
 COPY . .
+# Exact-size benchmarks and content lint inspect the same compiled processor
+# module and static site shipped in production. Keep both artifacts in the QA
+# image so every release command is independently reproducible.
+RUN npm run build
 CMD ["npm", "run", "test:e2e"]

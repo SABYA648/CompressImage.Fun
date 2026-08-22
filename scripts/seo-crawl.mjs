@@ -29,11 +29,17 @@ const anchors = [
   '/image-color-picker',
 ];
 const sitemapPaths = urls.map((url) => new URL(url).pathname);
+const guidePaths = sitemapPaths.filter((path) => path.startsWith('/guides/'));
+if (guidePaths.length < 25)
+  failures.push(
+    `guide library: expected at least 25 substantive guides, found ${guidePaths.length}`,
+  );
 for (const anchor of anchors)
   if (!sitemapPaths.includes(anchor)) failures.push(`${anchor}: missing from sitemap`);
 for (const url of urls) {
   const response = await fetch(url);
   const html = await response.text();
+  const pathname = new URL(url).pathname;
   const title = html.match(/<title>([^<]+)<\/title>/)?.[1];
   const description = html.match(/<meta name="description" content="([^"]+)"/)?.[1];
   const h1Count = (html.match(/<h1[\s>]/g) ?? []).length;
@@ -59,13 +65,33 @@ for (const url of urls) {
       failures.push(`${url}: invalid JSON-LD`);
     }
   }
+  if (html.includes('"@type":"WebApplication"')) {
+    const storyCount = Number(html.match(/data-story-count="(\d+)"/)?.[1] ?? 0);
+    if (storyCount < 5)
+      failures.push(`${url}: tool page exposes only ${storyCount} useful stories`);
+  }
+  if (pathname.startsWith('/guides/') && !/class="guide-tool"/.test(html))
+    failures.push(`${url}: guide does not contain a working contextual tool`);
 }
-for (const path of ['/robots.txt', '/sitemap-index.xml', '/llms.txt']) {
+for (const path of [
+  '/robots.txt',
+  '/sitemap-index.xml',
+  '/sitemap-images.xml',
+  '/guides/feed.xml',
+  '/llms.txt',
+]) {
   const response = await fetch(`${base}${path}`);
   if (!response.ok) failures.push(`${path}: ${response.status}`);
 }
 const missing = await fetch(`${base}/definitely-not-a-route`);
 if (missing.status !== 404) failures.push(`404 route returned ${missing.status}`);
+const missingHtml = await missing.text();
+if (
+  !/<meta name="robots" content="noindex, follow, noarchive"/.test(missingHtml) ||
+  !/id="quick-compressor"/.test(missingHtml) ||
+  !/class="error-scene"/.test(missingHtml)
+)
+  failures.push('404 route is missing noindex, useful compressor, or animated recovery scene');
 if (failures.length) {
   console.error(failures.join('\n'));
   process.exit(1);

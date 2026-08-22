@@ -27,7 +27,8 @@
     "benchmark:compression": "node scripts/benchmark-compression.mjs",
     "benchmark:exact": "node scripts/benchmark-exact-size.mjs",
     "test:load": "node scripts/load-test.mjs",
-    "test:lighthouse": "node scripts/lighthouse.mjs"
+    "test:lighthouse": "node scripts/lighthouse.mjs",
+    "test:visual": "node scripts/visual-qa.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

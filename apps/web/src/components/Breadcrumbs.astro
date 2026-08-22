@@ -12,7 +12,11 @@ const { items } = Astro.props as { items: Item[] };
       items.map((item, index) => (
         <li>
           {item.href ? (
-            <a href={item.href} data-umami-event="Breadcrumb Click" data-umami-event-target={item.label}>
+            <a
+              href={item.href}
+              data-umami-event="Breadcrumb Click"
+              data-umami-event-target={item.label}
+            >
               {item.label}
             </a>
           ) : (

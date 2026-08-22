@@ -50,6 +50,23 @@ const stageLabel: Record<string, string> = {
   complete: 'Complete',
 };
 const formats = ['original', 'jpeg', 'png', 'webp', 'avif'];
+const MAX_CLIENT_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_CLIENT_BATCH_BYTES = 500 * 1024 * 1024;
+const MAX_CLIENT_FILES = 50;
+const SUPPORTED_INPUT_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/avif',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'image/tiff',
+  'image/svg+xml',
+]);
+const SUPPORTED_INPUT_EXTENSION = /\.(?:jpe?g|png|webp|avif|gif|heic|heif|tiff?|svg)$/i;
+const SUPPORTED_INPUT_ACCEPT =
+  'image/jpeg,image/png,image/webp,image/avif,image/gif,image/heic,image/heif,image/tiff,image/svg+xml,.heic,.heif,.avif,.tif,.tiff,.svg';
 
 export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -102,10 +119,39 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
   );
 
   const addFiles = (incoming: File[]): void => {
-    const allowed = incoming.filter(
-      (file) => file.type.startsWith('image/') || /\.(heic|heif|avif|svg|tiff?)$/i.test(file.name),
+    const imageLike = incoming.filter(
+      (file) =>
+        SUPPORTED_INPUT_MIME.has(file.type.toLowerCase()) ||
+        SUPPORTED_INPUT_EXTENSION.test(file.name),
     );
-    const selected = tool.multiple ? allowed : allowed.slice(0, 1);
+    const smallEnough = imageLike.filter((file) => file.size <= MAX_CLIENT_FILE_BYTES);
+    const known = new Set(
+      files.map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`),
+    );
+    const unique = smallEnough.filter(
+      (file) => !known.has(`${file.name}:${file.size}:${file.lastModified}`),
+    );
+    const availableSlots = tool.multiple ? Math.max(0, MAX_CLIENT_FILES - files.length) : 1;
+    const withinCount = unique.slice(0, availableSlots);
+    let total = files.reduce((sum, item) => sum + item.file.size, 0);
+    const selected = withinCount.filter((file) => {
+      if (total + file.size > MAX_CLIENT_BATCH_BYTES) return false;
+      total += file.size;
+      return true;
+    });
+    const rejected = incoming.length - selected.length;
+    if (!selected.length) {
+      setError(
+        imageLike.length === 0
+          ? 'Choose a supported image file.'
+          : smallEnough.length === 0
+            ? 'Each image must be 100 MB or smaller.'
+            : availableSlots === 0
+              ? `This tool accepts ${tool.multiple ? 'up to 50 images' : 'one image'} at a time.`
+              : 'That image is already selected or would exceed the 500 MB batch safety limit.',
+      );
+      return;
+    }
     const next = selected.map((file) => ({ file, url: URL.createObjectURL(file) }));
     next.forEach((item) => {
       const image = new Image();
@@ -119,10 +165,16 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
         );
       image.src = item.url;
     });
-    setFiles((current) => (tool.multiple ? [...current, ...next].slice(0, 50) : next));
+    setFiles((current) =>
+      tool.multiple ? [...current, ...next].slice(0, MAX_CLIENT_FILES) : next,
+    );
     setDeleted(false);
     setJob(undefined);
-    setError('');
+    setError(
+      rejected > 0
+        ? `${rejected} ${rejected === 1 ? 'file was' : 'files were'} skipped because of type, size, duplicate, or batch limits.`
+        : '',
+    );
     track('file_selected', {
       tool_id: tool.id,
       file_count: selected.length,
@@ -380,7 +432,7 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
                   ref={inputRef}
                   hidden
                   type="file"
-                  accept={tool.accept ?? 'image/*,.heic,.heif,.avif,.svg,.tif,.tiff'}
+                  accept={tool.accept ?? SUPPORTED_INPUT_ACCEPT}
                   multiple={tool.multiple}
                   onChange={(event) => addFiles(Array.from(event.currentTarget.files ?? []))}
                 />
@@ -389,6 +441,13 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
             <div class="privacy-note">
               Processed securely on our server. Files auto-delete within four hours.
             </div>
+            {error && (
+              <div class="error-box" role="alert">
+                <strong>Choose a different file.</strong>
+                <br />
+                {error}
+              </div>
+            )}
           </>
         ) : (
           <>
@@ -410,7 +469,7 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
                   ref={inputRef}
                   hidden
                   type="file"
-                  accept={tool.accept ?? 'image/*,.heic,.heif,.avif,.svg,.tif,.tiff'}
+                  accept={tool.accept ?? SUPPORTED_INPUT_ACCEPT}
                   multiple={tool.multiple}
                   onChange={(event) => addFiles(Array.from(event.currentTarget.files ?? []))}
                 />

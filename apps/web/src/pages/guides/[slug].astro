@@ -2,12 +2,17 @@
 import SiteLayout from '../../layouts/SiteLayout.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import RelatedTools from '../../components/RelatedTools.astro';
+import ToolEmbed from '../../components/ToolEmbed.astro';
 import { guides } from '../../data/guides';
+import { toolById } from '../../data/tools';
 
 export function getStaticPaths() {
   return guides.map((guide) => ({ params: { slug: guide.slug }, props: { guide } }));
 }
 const { guide } = Astro.props;
+const primaryTool =
+  guide.relatedTools.map((id: string) => toolById.get(id)).find(Boolean) ??
+  toolById.get('image-compressor')!;
 ---
 
 <SiteLayout
@@ -16,20 +21,34 @@ const { guide } = Astro.props;
   canonicalPath={`/guides/${guide.slug}`}
   pageType="article"
   h1={guide.title}
+  updatedAt="2026-08-23"
 >
   <Breadcrumbs items={[{ label: 'Guides', href: '/guides' }, { label: guide.title }]} />
   <header class="hero compact">
     <div class="shell">
-      <div class="eyebrow">{guide.readMinutes} minute guide</div><h1>{guide.title}</h1><p
-        class="lead"
-      >
+      <div class="eyebrow">{guide.readMinutes} minute guide · Updated August 23, 2026</div><h1>
+        {guide.title}
+      </h1><p class="lead">
         {guide.description}
       </p>
     </div>
   </header>
   <article class="article shell">
     <div class="article-body">
-      <p class="article-summary">{guide.summary}</p>{
+      <p class="article-summary">{guide.summary}</p>
+    </div>
+    <section class="guide-tool" aria-labelledby="guide-tool-title">
+      <div class="guide-tool-heading">
+        <div>
+          <div class="eyebrow">Do it here</div>
+          <h2 id="guide-tool-title">{primaryTool.h1}</h2>
+        </div>
+        <p>{primaryTool.lead}</p>
+      </div>
+      <ToolEmbed tool={primaryTool} />
+    </section>
+    <div class="article-body">
+      {
         guide.sections.map((section) => (
           <section>
             <h2>{section.heading}</h2>
