@@ -16,6 +16,11 @@ const { guide } = Astro.props;
   canonicalPath={`/guides/${guide.slug}`}
   pageType="article"
   h1={guide.title}
+  breadcrumbs={[
+    { name: 'Home', path: '/' },
+    { name: 'Guides', path: '/guides' },
+    { name: guide.title, path: `/guides/${guide.slug}` },
+  ]}
 >
   <Breadcrumbs items={[{ label: 'Guides', href: '/guides' }, { label: guide.title }]} />
   <header class="hero compact">

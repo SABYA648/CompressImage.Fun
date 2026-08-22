@@ -1,6 +1,6 @@
 # compressimage.fun
 
-Drop an image. Get exactly what you need.
+Drop an image. Get the size you actually need.
 
 ## Live site
 

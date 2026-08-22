@@ -17,6 +17,11 @@ const { tool } = Astro.props;
   canonicalPath={`/${tool.slug}`}
   pageType="tool"
   h1={tool.h1}
+  breadcrumbs={[
+    { name: 'Home', path: '/' },
+    { name: 'Tools', path: '/tools' },
+    { name: tool.h1, path: `/${tool.slug}` },
+  ]}
 >
   <ToolPage tool={tool} />
 </SiteLayout>

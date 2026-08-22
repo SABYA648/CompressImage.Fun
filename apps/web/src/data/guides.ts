@@ -345,4 +345,69 @@ export const guides: Guide[] = [
       'resize-image',
     ],
   },
+  {
+    slug: 'browser-versus-server-image-tools',
+    title: 'Which image tools upload, and which stay in the browser',
+    description:
+      'A precise boundary: compression and conversion upload temporarily; Base64, Image to PDF, and the color picker do not.',
+    readMinutes: 5,
+    summary:
+      'If the workspace says it is a server job, the file leaves the tab. If it says browser-only, the processing API is not used for the file. Page analytics, when built in, is a separate channel.',
+    sections: [
+      {
+        heading: 'Server jobs',
+        paragraphs: [
+          'The homepage compressor, exact-size pages, batch ZIP, resize, crop, rotate, converters, metadata tools, form-photo tools, watermarks, and the favicon generator POST the file to the same-origin API. That is required for Sharp/libvips work, HEIC decode, and bounded CPU on the VPS.',
+        ],
+        bullets: [
+          'Files live in a random job directory, not under your original name.',
+          'A bearer token is required to preview, download, or delete.',
+          'TTL is four hours unless you choose Delete now.',
+        ],
+      },
+      {
+        heading: 'Browser-only jobs',
+        paragraphs: [
+          'Image to Base64, Base64 to Image, the Base64 viewer, Image to Data URI, Image to PDF, and the color picker keep the payload in this tab. Automated tests fail the route if it calls /api with the file.',
+        ],
+      },
+      {
+        heading: 'Do not mix the slogans',
+        paragraphs: [
+          'A site that uploads for compression cannot honestly say “no upload” on that compressor. Squoosh-style local codecs are a different architecture. compressimage.fun uses both, on purpose, and labels them.',
+        ],
+      },
+    ],
+    relatedTools: ['image-compressor', 'image-to-base64', 'image-to-pdf', 'image-color-picker'],
+  },
+  {
+    slug: 'animated-gif-and-webp-are-rejected-for-now',
+    title: 'Why animated GIF and animated WebP are rejected',
+    description:
+      'Still frames can be processed. Multi-frame GIF and WebP are detected and refused instead of being silently flattened.',
+    readMinutes: 4,
+    summary:
+      'Flattening an animation into one frame would look like success and destroy timing. This version refuses those files until a future adapter can keep every frame.',
+    sections: [
+      {
+        heading: 'Detection, not a fake GIF compressor',
+        paragraphs: [
+          'GIF is a supported container for inspection. If the decoder reports multiple frames, processing stops with an explicit error. The same rule applies to animated WebP.',
+        ],
+      },
+      {
+        heading: 'Still GIF',
+        paragraphs: [
+          'A single-frame GIF can be decoded and re-encoded to JPEG, PNG, WebP, or AVIF like other still inputs. That is not animation support.',
+        ],
+      },
+      {
+        heading: 'What we will not claim',
+        paragraphs: [
+          'We do not advertise GIF compression as a feature while the engine refuses animations. Use a dedicated animation tool if you need to keep motion.',
+        ],
+      },
+    ],
+    relatedTools: ['image-compressor', 'convert-image', 'compress-webp'],
+  },
 ];

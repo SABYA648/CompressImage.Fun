@@ -11,6 +11,7 @@ const tool = toolById.get('image-compressor')!;
   canonicalPath="/"
   pageType="tool"
   h1={tool.h1}
+  breadcrumbs={[{ name: 'Home', path: '/' }]}
 >
   <ToolPage tool={tool} home />
 </SiteLayout>

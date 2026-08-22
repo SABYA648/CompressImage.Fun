@@ -1,5 +1,7 @@
 ---
 import type { ToolDefinition } from '../data/tools';
+import { isBrowserToolKind, userJobs } from '../data/jobs';
+import { toolFaqs } from '../data/tool-faqs';
 import Base64Workspace from './Base64Workspace';
 import ColorPickerWorkspace from './ColorPickerWorkspace';
 import Breadcrumbs from './Breadcrumbs.astro';
@@ -8,20 +10,33 @@ import RelatedTools from './RelatedTools.astro';
 import ToolWorkspace from './ToolWorkspace';
 
 const { tool, home = false } = Astro.props as { tool: ToolDefinition; home?: boolean };
-const browserOnly = ['base64-encode', 'base64-decode', 'base64-viewer'].includes(tool.kind);
-const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'color-picker';
+const localTool = isBrowserToolKind(tool.kind);
+const faqs =
+  toolFaqs[tool.id] ??
+  (tool.operation &&
+  typeof tool.operation === 'object' &&
+  'mode' in tool.operation &&
+  tool.operation.mode === 'exact'
+    ? toolFaqs['compress-image-to-size']
+    : []);
+const presetCustom =
+  tool.id.startsWith('compress-') && tool.id.endsWith('kb') ? true : tool.id === 'compress-1024kb';
 ---
 
-{!home && <Breadcrumbs items={[{ label: 'Tools', href: '/tools' }, { label: tool.h1 }]} />}
+{
+  !home && (
+    <Breadcrumbs items={[{ label: 'Tools', href: '/tools' }, { label: tool.h1 }]} />
+  )
+}
 <header class:list={['hero', { compact: !home }]}>
   <div class="shell">
-    <div class="eyebrow">{tool.category} · Free, no signup</div>
+    <div class="eyebrow">{tool.category} · {localTool ? 'Browser-only' : 'Temporary server job'}</div>
     <h1>{tool.h1}</h1>
     <p class="lead">{tool.lead}</p>
     <ul class="trust-row" aria-label="Product promises">
       <li>No watermark</li>
-      <li>{localTool ? 'Stays in your browser' : 'Delete immediately'}</li>
-      <li>Real quality controls</li>
+      <li>{localTool ? 'Stays in your browser' : 'Uploads, then Delete now'}</li>
+      <li>Quality tradeoffs visible</li>
     </ul>
   </div>
 </header>
@@ -31,10 +46,37 @@ const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'col
     <ImageToPdfWorkspace tool={tool} client:load />
   ) : tool.kind === 'color-picker' ? (
     <ColorPickerWorkspace tool={tool} client:load />
-  ) : browserOnly ? (
+  ) : ['base64-encode', 'base64-decode', 'base64-viewer'].includes(tool.kind) ? (
     <Base64Workspace tool={tool} client:load />
   ) : (
     <ToolWorkspace tool={tool} client:load />
+  )
+}
+
+{
+  home && (
+    <section class="content-section">
+      <div class="shell">
+        <div class="section-heading">
+          <div class="eyebrow">Pick the job</div>
+          <h2>The compressor stays here. Adjacent chores have their own doors.</h2>
+          <p>
+            Homepage owns generic compression. Exact KB, conversion, form photos, and browser
+            utilities live on dedicated URLs so they do not fight this page in search.
+          </p>
+        </div>
+        <div class="job-grid">
+          {
+            userJobs.map((job) => (
+              <a class="job-card" href={job.href} data-umami-event="Job Card Click" data-umami-event-job={job.id}>
+                <strong>{job.label}</strong>
+                <p>{job.text}</p>
+              </a>
+            ))
+          }
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -43,7 +85,7 @@ const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'col
     <div class="section-heading">
       <div class="eyebrow">Three clean steps</div>
       <h2>Get the result, then get on with it</h2>
-      <p>The workspace keeps choices close to the file. Explanations stay down here.</p>
+      <p>The workspace stays above this explanation on purpose.</p>
     </div>
     <ol class="step-list">{tool.steps.map((step) => <li>{step}</li>)}</ol>
   </div>
@@ -67,8 +109,39 @@ const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'col
         ))
       }
     </div>
+    {
+      presetCustom && (
+        <p class="preset-switch">
+          Need a different cap? <a href="/compress-image-to-size">Type any KB or MB</a> instead of
+          collecting another preset URL.
+        </p>
+      )
+    }
   </div>
 </section>
+
+{
+  faqs.length > 0 && (
+    <section class="content-section tint">
+      <div class="shell">
+        <div class="section-heading">
+          <div class="eyebrow">Straight answers</div>
+          <h2>Questions this page should settle</h2>
+        </div>
+        <div class="faq-list">
+          {
+            faqs.map((faq) => (
+              <article class="note">
+                <h3>{faq.question}</h3>
+                <p>{faq.answer}</p>
+              </article>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+  )
+}
 
 {
   home && (
@@ -78,7 +151,10 @@ const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'col
           <>
             <div class="eyebrow">One image workspace</div>
             <h2>Compression is the start, not a dead end</h2>
-            <p>Resize, convert, inspect, or clean the result without searching for a new tool.</p>
+            <p>
+              Server tools upload. Browser tools do not. <a href="/how-processing-works">See the
+              data flow</a> and <a href="/compression-tests">the measured exact-size tests</a>.
+            </p>
           </>
         </div>
         <div class="feature-grid">
@@ -98,17 +174,17 @@ const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'col
               <h3>Do the whole folder</h3>
               <p>
                 Apply one setting to many images, follow each output, and download the results
-                together as a ZIP.
+                together as a ZIP. Still a server job.
               </p>
             </>
           </article>
           <article class="feature">
             <>
-              <div class="number">03 · PRIVATE</div>
-              <h3>Temporary by design</h3>
+              <div class="number">03 · TEMPORARY</div>
+              <h3>Uploaded, then deleted</h3>
               <p>
-                Private capability tokens protect server jobs. Delete now is immediate, and
-                automatic cleanup happens within four hours.
+                Private capability tokens protect server jobs. Delete now is immediate. Automatic
+                cleanup happens within four hours. Analytics, when built in, never receives the file.
               </p>
             </>
           </article>

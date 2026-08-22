@@ -113,15 +113,24 @@ No secrets are required.
 | `MAX_ANIMATION_FRAMES`            | `500`        | Frame safety limit                                |
 | `PROCESS_TIMEOUT_MS`              | `60000`      | Per file timeout. Minimum 1000                    |
 | `MIN_FREE_DISK_BYTES`             | `1073741824` | Uploads are refused with 503 below 1 GB free      |
-| `PUBLIC_GA_MEASUREMENT_ID`        | empty        | Build time. Leave empty until analytics is wanted |
+| `PUBLIC_GA_MEASUREMENT_ID`        | empty        | Build time. Production inspected 22 Aug 2026 had `G-W530RG17S3` |
+| `PUBLIC_UMAMI_WEBSITE_ID`         | empty        | Build time. Injects Umami only when set |
+| `PUBLIC_UMAMI_SCRIPT_URL`         | empty        | Must be `https://analytics.sabya.pm/script.js` if used |
 | `PUBLIC_GOOGLE_SITE_VERIFICATION` | empty        | Build time, optional                              |
 | `PUBLIC_BING_SITE_VERIFICATION`   | empty        | Build time, optional                              |
 
 `PUBLIC_GA_MEASUREMENT_ID` is optional and must not be required for deployment.
-Leaving it empty is supported: no analytics request is made and no console error
-appears.
+Leaving it empty is supported: no Google Analytics request is made.
 
-The three `PUBLIC_` values are read when the static site is built, so changing
+Umami is also build-time and off when `PUBLIC_UMAMI_WEBSITE_ID` is empty. Do not
+hardcode a website ID in the image if the privacy policy says analytics is
+configurable.
+
+Attach both `compressimage.fun` and `www.compressimage.fun` to the `web`
+service. Nginx 301s `www` to the apex. Confirm after deploy that
+`https://www.compressimage.fun/` returns 301, not a second 200 copy.
+
+The `PUBLIC_` values are read when the static site is built, so changing
 them requires a rebuild, not just a restart. Set them in Coolify's environment
 before deploying so Docker Compose passes them as image build arguments.
 

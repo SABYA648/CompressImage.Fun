@@ -8,6 +8,7 @@ interface Props {
   canonicalPath?: string;
   pageType?: 'tool' | 'article' | 'page';
   h1?: string;
+  breadcrumbs?: Array<{ name: string; path: string }>;
 }
 
 const {
@@ -16,38 +17,71 @@ const {
   canonicalPath = Astro.url.pathname,
   pageType = 'page',
   h1,
+  breadcrumbs,
 } = Astro.props;
 const canonical = new URL(canonicalPath || '/', 'https://compressimage.fun').toString();
 const verificationGoogle = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION;
 const verificationBing = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
 const gaId = String(import.meta.env.PUBLIC_GA_MEASUREMENT_ID ?? '').trim();
 const safeGaId = /^G-[A-Z0-9]+$/i.test(gaId) ? gaId.toUpperCase() : undefined;
+const umamiId = String(import.meta.env.PUBLIC_UMAMI_WEBSITE_ID ?? '').trim();
+const umamiSrc = String(
+  import.meta.env.PUBLIC_UMAMI_SCRIPT_URL ?? 'https://analytics.sabya.pm/script.js',
+).trim();
+const safeUmamiId = /^[a-z0-9-]{8,}$/i.test(umamiId) ? umamiId : undefined;
+const safeUmamiSrc =
+  safeUmamiId && /^https:\/\/analytics\.sabya\.pm\/script\.js$/.test(umamiSrc)
+    ? umamiSrc
+    : undefined;
 const popular = tools.filter((tool) => tool.popular).slice(0, 5);
+const organization = {
+  '@type': 'Organization',
+  '@id': 'https://compressimage.fun/#organization',
+  name: 'compressimage.fun',
+  url: 'https://compressimage.fun/',
+};
+const website = {
+  '@type': 'WebSite',
+  '@id': 'https://compressimage.fun/#website',
+  url: 'https://compressimage.fun/',
+  name: 'compressimage.fun',
+  description:
+    'Compress an image to the size you actually need, with quality tradeoffs visible. Temporary server jobs plus browser-only Base64, PDF, and color tools.',
+  publisher: { '@id': 'https://compressimage.fun/#organization' },
+};
+const breadcrumbSchema = breadcrumbs?.length
+  ? {
+      '@type': 'BreadcrumbList',
+      itemListElement: breadcrumbs.map((item, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: item.name,
+        item: new URL(item.path, 'https://compressimage.fun').toString(),
+      })),
+    }
+  : undefined;
 const schema =
   pageType === 'article'
     ? {
         '@context': 'https://schema.org',
-        '@type': 'Article',
-        headline: h1 ?? title,
-        description,
-        mainEntityOfPage: canonical,
-        publisher: {
-          '@type': 'Organization',
-          name: 'compressimage.fun',
-          url: 'https://compressimage.fun/',
-        },
+        '@graph': [
+          organization,
+          website,
+          {
+            '@type': 'Article',
+            headline: h1 ?? title,
+            description,
+            mainEntityOfPage: canonical,
+            publisher: { '@id': 'https://compressimage.fun/#organization' },
+          },
+          ...(breadcrumbSchema ? [breadcrumbSchema] : []),
+        ],
       }
     : {
         '@context': 'https://schema.org',
         '@graph': [
-          {
-            '@type': 'WebSite',
-            '@id': 'https://compressimage.fun/#website',
-            url: 'https://compressimage.fun/',
-            name: 'compressimage.fun',
-            description:
-              'Free image compression and conversion tools without signup or watermarks.',
-          },
+          organization,
+          website,
           ...(pageType === 'tool'
             ? [
                 {
@@ -57,11 +91,23 @@ const schema =
                   applicationCategory: 'MultimediaApplication',
                   operatingSystem: 'Any',
                   browserRequirements: 'Requires a modern web browser',
+                  isAccessibleForFree: true,
                   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
                   description,
+                  ...(canonical === 'https://compressimage.fun/'
+                    ? {
+                        featureList: [
+                          'Exact KB and MB compression with quality-first search',
+                          'Batch compression without signup or product watermark',
+                          'Temporary same-origin server processing with Delete now',
+                          'Browser-only Base64, Image to PDF, and color picker tools',
+                        ],
+                      }
+                    : {}),
                 },
               ]
             : []),
+          ...(breadcrumbSchema ? [breadcrumbSchema] : []),
         ],
       };
 ---
@@ -89,7 +135,7 @@ const schema =
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="compressimage.fun: Compress images without the guesswork"
+      content="compressimage.fun: compress to the size you actually need"
     />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
@@ -113,12 +159,17 @@ const schema =
         </>
       )
     }
-    <script
-      is:inline
-      defer
-      src="https://analytics.sabya.pm/script.js"
-      data-website-id="81d738e7-a725-4c3c-aac3-c6fde9c735ad"
-    ></script>
+    {
+      safeUmamiId && safeUmamiSrc && (
+        <script is:inline define:vars={{ umamiSrc: safeUmamiSrc, umamiId: safeUmamiId }}>
+          const script = document.createElement('script');
+          script.defer = true;
+          script.src = umamiSrc;
+          script.dataset.websiteId = umamiId;
+          document.head.appendChild(script);
+        </script>
+      )
+    }
   </head>
   <body>
     <a class="skip-link" href="#main" data-umami-event="Skip to Main Content">Skip to main content</a>
@@ -131,6 +182,7 @@ const schema =
         <nav aria-label="Main navigation">
           <a href="/tools" data-umami-event="Nav Click: All Tools">All tools</a>
           <a href="/compress-image-to-size" data-umami-event="Nav Click: Exact Size">Exact size</a>
+          <a href="/how-processing-works" data-umami-event="Nav Click: How processing works">How it works</a>
           <a href="/guides" data-umami-event="Nav Click: Guides">Guides</a>
           <a href="/privacy" data-umami-event="Nav Click: Privacy">Privacy</a>
         </nav>
@@ -142,7 +194,7 @@ const schema =
       <div class="shell footer-grid">
         <div>
           <a class="brand footer-brand" href="/" data-umami-event="Footer Brand Click">compressimage<span>.fun</span></a>
-          <p>Drop an image. Get exactly what you need.</p>
+          <p>Compress to the size you actually need, with the tradeoffs visible.</p>
           <p class="muted">No account, no watermark, no artificial daily limit.</p>
         </div>
         <div>
@@ -161,6 +213,8 @@ const schema =
           <h2>Project</h2>
           <ul>
             <li><a href="/privacy" data-umami-event="Footer Link Click: Privacy">Privacy</a></li>
+            <li><a href="/how-processing-works" data-umami-event="Footer Link Click: How processing works">How processing works</a></li>
+            <li><a href="/compression-tests" data-umami-event="Footer Link Click: Compression tests">Compression tests</a></li>
             <li><a href="/guides" data-umami-event="Footer Link Click: Guides">Guides</a></li>
             <li><a href="/tools" data-umami-event="Footer Link Click: Tools">Tool index</a></li>
             <li><a href="/llms.txt" data-umami-event="Footer Link Click: llms.txt">llms.txt</a></li>

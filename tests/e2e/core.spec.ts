@@ -15,7 +15,9 @@ test.beforeAll(async () => {
 
 test('homepage compresses, reports result, downloads, chains, and deletes', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Compress images');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    'Compress an image to the size you actually need',
+  );
   await page.locator('input[type=file]').setInputFiles(photo);
   await page.getByRole('button', { name: /Process image/ }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });
@@ -172,7 +174,7 @@ test('tool search and public crawl files work', async ({ page, request }) => {
   await expect(visibleCards.filter({ hasText: 'HEIC to JPG Converter' })).toHaveCount(1);
   await expect(visibleCards.filter({ hasText: 'Resize a passport or form photo' })).toHaveCount(0);
   expect(await visibleCards.count()).toBeLessThan(total);
-  for (const path of ['/robots.txt', '/sitemap-index.xml', '/llms.txt'])
+  for (const path of ['/robots.txt', '/sitemap-index.xml', '/llms.txt', '/how-processing-works'])
     expect((await request.get(path)).status()).toBe(200);
   expect((await request.get('/missing-route-for-test')).status()).toBe(404);
 });

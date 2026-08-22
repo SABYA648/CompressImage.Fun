@@ -8,6 +8,8 @@ export function GET() {
     '/tools',
     '/guides',
     '/privacy',
+    '/how-processing-works',
+    '/compression-tests',
     ...tools.filter((tool) => tool.slug).map(toolPath),
     ...guides.map((guide) => `/guides/${guide.slug}`),
   ];

@@ -1,0 +1,85 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+---
+
+<SiteLayout
+  title="How Image Processing Works | Browser vs Server"
+  description="Diagram and rules for which compressimage.fun tools upload, how jobs are tokenized, when files delete, and which utilities never leave the browser."
+  canonicalPath="/how-processing-works"
+  pageType="article"
+  h1="How processing works"
+  breadcrumbs={[
+    { name: 'Home', path: '/' },
+    { name: 'How processing works', path: '/how-processing-works' },
+  ]}
+>
+  <header class="hero compact">
+    <div class="shell">
+      <div class="eyebrow">Architecture you can quote</div>
+      <h1>How an image moves through compressimage.fun</h1>
+      <p class="lead">
+        Two paths exist. Mixing them in copy is how sites accidentally claim “no upload” for a
+        server compressor.
+      </p>
+    </div>
+  </header>
+  <article class="article shell">
+    <div class="article-body">
+      <p class="article-summary">
+        Compression, conversion, resize, crop, rotate, metadata, watermarks, favicons, and form-photo
+        tools upload to the same origin. Base64, Image to PDF, and the color picker do not.
+      </p>
+      <section>
+        <h2>Server path</h2>
+        <ol class="flow-list">
+          <li>The browser sends the file to <code>/api</code> on compressimage.fun.</li>
+          <li>Nginx proxies to the private Fastify processor. The job ID is random.</li>
+          <li>A separate high-entropy bearer token authorizes preview, download, and delete.</li>
+          <li>Sharp/libvips decodes, transforms, and writes outputs on an isolated volume.</li>
+          <li>You download. Delete now wipes the directory. Otherwise TTL cleanup runs within four hours.</li>
+        </ol>
+        <pre class="flow-diagram" aria-label="Server processing flow">{`browser file
+    → HTTPS same-origin POST /api
+    → nginx (noindex, no-store)
+    → processor job directory (random names)
+    → Sharp/libvips
+    → preview / download with bearer token
+    → Delete now or TTL ≤ 4 hours`}</pre>
+      </section>
+      <section>
+        <h2>Browser path</h2>
+        <pre class="flow-diagram" aria-label="Browser processing flow">{`file or pasted text
+    → this tab’s memory
+    → canvas / encoder / text output
+    → download from the browser
+    → no /api upload of the file`}</pre>
+        <p>
+          Image to PDF, color picker, and the Base64 suite follow this path. They still fetch CSS,
+          JS, and (if configured) analytics scripts for the page itself.
+        </p>
+      </section>
+      <section>
+        <h2>Exact-size search</h2>
+        <p>
+          A codec quality number is not a kilobyte target. The optimizer keeps original dimensions,
+          tries a bounded quality search, measures encoded bytes, and only then walks a fixed scale
+          sequence. It never pads a file up to the cap. If nothing fits, it says so.
+        </p>
+        <p>
+          See the <a href="/compression-tests">published fixture measurements</a> and the
+          <a href="/guides/how-to-compress-image-to-exact-file-size">exact-size guide</a>.
+        </p>
+      </section>
+      <section>
+        <h2>Limits that are real, not marketing</h2>
+        <ul>
+          <li>Default per-file upload ceiling: 100 MB.</li>
+          <li>Default batch: 50 files and 500 MB combined.</li>
+          <li>Default pixel ceiling: 100 megapixels.</li>
+          <li>Animated sources are detected and rejected in this version.</li>
+          <li>Unsafe SVG (scripts, event handlers, foreign objects, remote references) is rejected.</li>
+        </ul>
+      </section>
+    </div>
+  </article>
+</SiteLayout>

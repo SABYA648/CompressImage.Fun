@@ -52,76 +52,106 @@ const compression = (
   steps: baseSteps,
   notes: [
     {
-      title: 'Quality first',
-      text: 'Smart mode keeps the original format and uses a high-quality codec setting. Exact Size searches several encodes instead of guessing.',
+      title: 'Quality first, then pixels',
+      text: 'Exact Size searches encodings at the original dimensions. It reduces width and height only when that search still cannot meet the cap. Smart mode is a high-quality starting point, not a lossless promise.',
     },
     {
-      title: 'Private by default',
-      text: 'Server-processed files use a private job token and are deleted automatically within four hours.',
+      title: 'This tool uploads the file',
+      text: 'Compression runs on compressimage.fun servers. Jobs use a private token. Files auto-delete within four hours, and Delete now removes them immediately.',
+    },
+    {
+      title: 'Formats, honestly',
+      text: 'JPG, PNG, WebP, AVIF, TIFF, still GIF, HEIC when the production decoder can read it, and safe SVG rasterization are supported. Animated GIF and animated WebP are rejected rather than flattened. SVG with scripts or remote references is rejected.',
     },
   ],
-  related: ['compress-image-to-size', 'resize-image', 'convert-image', 'remove-image-metadata'],
+  related: ['compress-image-to-size', 'batch-compress-images', 'convert-image', 'remove-image-metadata'],
   ...input,
 });
 
 const exactPages = [
   {
     kb: 20,
+    useCase: 'thumbnails and the strictest upload ceilings',
     detail:
-      '20 KB is an extreme cap for most photos. The optimizer may need fewer pixels to keep the image readable.',
+      '20 KB is an extreme cap for most photos. Expect fewer pixels, softer faces, and damaged small type. Crop tightly before you start.',
+    whenToChoose:
+      'Use this page only when the destination names 20 KB. For any other number, type it on the custom size tool.',
   },
   {
     kb: 50,
+    useCase: 'strict profile and ID-style uploads',
     detail:
-      '50 KB works for strict upload forms. Faces and fine text benefit from starting with a tightly cropped image.',
+      '50 KB is a common hard ceiling on older forms. Faces survive better if you crop first and keep the subject large in the frame.',
+    whenToChoose:
+      'Choose 50 KB when that is the written limit. It is not a passport, visa, or exam acceptance guarantee.',
   },
   {
     kb: 100,
+    useCase: 'everyday form photos and document scans',
     detail:
-      '100 KB is a practical balance for profile photos, documents, and everyday form uploads.',
+      '100 KB is often enough for a readable portrait or a one-page scan without looking like a thumbnail.',
+    whenToChoose:
+      'Start here for many “under 100 KB” fields. If the form also sets pixels, resize or use the form-photo tool.',
   },
   {
     kb: 200,
+    useCase: 'controlled uploads that still want detail',
     detail:
-      '200 KB leaves more room for detail while still satisfying many controlled upload workflows.',
+      '200 KB leaves more room for hair, fabric, and fine text while remaining inside many CMS and ticket-upload caps.',
+    whenToChoose:
+      'Use 200 KB when the form allows it. A larger cap is wasted if you later convert to a noisier format.',
   },
   {
     kb: 500,
+    useCase: 'email attachments and ordinary web publishing',
     detail:
-      '500 KB is useful for email and web publishing when you want strong visual quality without a heavy download.',
+      '500 KB usually keeps a web-sized photograph looking clean. It is still a cap, not a quality score.',
+    whenToChoose:
+      'Prefer 500 KB when the destination is a page or mailbox rather than a 20–50 KB government field.',
   },
   {
     kb: 1024,
     label: '1 MB',
+    useCase: 'large photographs that still need a ceiling',
     detail:
-      'A 1 MB ceiling usually preserves generous detail in large photographs and portfolio images.',
+      'A 1 MB ceiling usually preserves generous detail in large photographs. Camera originals can still need a quality search.',
+    whenToChoose:
+      'Use 1 MB when a site or email path blocks bigger files but you want to keep as many pixels as the search allows.',
   },
 ];
 
-const exactTools = exactPages.map(({ kb, label = `${kb} KB`, detail }): ToolDefinition =>
-  compression({
-    id: `compress-${kb}kb`,
-    slug: kb === 1024 ? 'compress-image-to-1mb' : `compress-image-to-${kb}kb`,
-    title: `Compress Image to ${label} Free | compressimage.fun`,
-    description: `Compress an image to ${label} or less with a measured quality search. No signup, watermark, or guesswork.`,
-    h1: `Compress an image to ${label}`,
-    lead: `${detail} Enter the cap once and the engine searches for the best result at or below it.`,
-    operation: {
-      kind: 'compress',
-      mode: 'exact',
-      format: 'original',
-      targetBytes: kb * 1024,
-      minQuality: 35,
-    },
-    notes: [
-      {
-        title: `What ${label} means`,
-        text: `The output will be at or below ${label}, not padded to an exact byte count. If the source is already small enough, it stays unchanged.`,
+const exactTools = exactPages.map(
+  ({ kb, label = `${kb} KB`, detail, useCase, whenToChoose }): ToolDefinition =>
+    compression({
+      id: `compress-${kb}kb`,
+      slug: kb === 1024 ? 'compress-image-to-1mb' : `compress-image-to-${kb}kb`,
+      title: `Compress Image to ${label} | Quality Search First`,
+      description: `Compress an image to ${label} or less for ${useCase}. Quality is searched before dimensions change. Output is at or below the cap, never padded.`,
+      h1: `Compress an image to ${label}`,
+      lead: `${detail} The same exact-size engine powers every cap. Need a different number? Type it on the custom size tool.`,
+      operation: {
+        kind: 'compress',
+        mode: 'exact',
+        format: 'original',
+        targetBytes: kb * 1024,
+        minQuality: 35,
       },
-      { title: 'When pixels change', text: detail },
-    ],
-    related: ['compress-image-to-size', 'resize-image', 'jpg-to-webp', 'image-metadata'],
-  }),
+      notes: [
+        {
+          title: `What ${label} means`,
+          text: `The file will be at or below ${label}, not padded to that count. ${whenToChoose}`,
+        },
+        {
+          title: 'Quality search, then dimensions',
+          text: detail,
+        },
+        {
+          title: 'This page uploads the file',
+          text: 'Preset pages are the server compressor with a prefilled cap. They are not a separate browser-only engine.',
+        },
+      ],
+      related: ['compress-image-to-size', 'resize-image', 'passport-photo-resizer', 'image-metadata'],
+    }),
 );
 
 const converterPairs: Array<[string, string, string, string, string]> = [
@@ -195,21 +225,21 @@ export const tools: ToolDefinition[] = [
     id: 'image-compressor',
     slug: '',
     popular: true,
-    title: 'Free Image Compressor | Compress JPG, PNG, WebP & AVIF',
+    title: 'Compress an Image to the Size You Need | compressimage.fun',
     description:
-      'Compress images online with Smart, quality, lossless, batch, and exact-size modes. Free, no signup, no watermark.',
-    h1: 'Compress images without the guesswork',
-    lead: 'Smaller files, your size target, no nonsense. Drop in JPG, PNG, WebP, AVIF, HEIC, TIFF, GIF, or SVG files.',
+      'Compress JPG, PNG, WebP, and AVIF to a KB or MB cap. Quality is searched first. Dimensions shrink only when needed. No signup or watermark.',
+    h1: 'Compress an image to the size you actually need',
+    lead: 'Quality tradeoffs stay visible. Exact Size measures encoded bytes, keeps the highest practical quality under your cap, and reduces pixels only when that search still cannot fit.',
   }),
   compression({
     id: 'compress-image-to-size',
     slug: 'compress-image-to-size',
     popular: true,
-    title: 'Compress Image to Exact KB or MB | Free Target Size Tool',
+    title: 'Compress Image to Any KB or MB | Exact Size Tool',
     description:
-      'Set any KB or MB limit and get the highest practical image quality at or below your target.',
-    h1: 'Compress an image to a specific size',
-    lead: 'Need it under 73 KB? Tell us 73 KB. The engine searches quality first, then carefully reduces dimensions only when needed.',
+      'Type any KB or MB limit. The optimizer searches quality at the original pixels, then reduces dimensions only if the cap still cannot be met.',
+    h1: 'Compress to any KB or MB cap',
+    lead: 'Need 73 KB? Enter 73 KB. The result is at or below that cap, never padded, with the search steps visible in the result card.',
     operation: {
       kind: 'compress',
       mode: 'exact',
@@ -221,22 +251,22 @@ export const tools: ToolDefinition[] = [
   compression({
     id: 'compress-jpeg',
     slug: 'compress-jpeg',
-    title: 'Compress JPEG Online Free | JPG Compressor',
+    title: 'Compress JPEG Online | Progressive JPG, Quality and Exact Size',
     description:
-      'Reduce JPEG and JPG file size with progressive encoding, quality control, batch support, and exact targets.',
+      'Reduce JPEG file size with progressive encoding, quality control, batch support, and measured KB caps. Lossy by design. No signup.',
     h1: 'Compress JPEG files',
-    lead: 'Shrink photographs and scans while keeping them crisp. Progressive JPEG output and controlled quality are built in.',
+    lead: 'Photographs and scans shrink with a quality number you can see. JPEG has no alpha channel. Repeating save cycles can add more loss.',
     accept: 'image/jpeg,.jpg,.jpeg',
     operation: { kind: 'compress', mode: 'smart', format: 'jpeg' },
   }),
   compression({
     id: 'compress-png',
     slug: 'compress-png',
-    title: 'Compress PNG Online Free | Lossless PNG Optimizer',
+    title: 'Compress PNG Online | Transparency Preserved',
     description:
-      'Optimize PNG images with lossless compression or controlled palette reduction while preserving transparency.',
+      'Optimize PNG images. Lossless mode keeps decoded pixels. Quality mode may use a palette. Exact Size can reduce quality or dimensions to meet a cap.',
     h1: 'Compress PNG images',
-    lead: 'Keep transparency and choose lossless optimization or a smaller palette-based result.',
+    lead: 'Keep transparency. Lossless mode does not promise a smaller file. Noisy photographs often stay large until you change format or pixels.',
     accept: 'image/png,.png',
     operation: { kind: 'compress', mode: 'lossless', format: 'png' },
   }),
@@ -266,10 +296,11 @@ export const tools: ToolDefinition[] = [
     id: 'batch-compress-images',
     slug: 'batch-compress-images',
     popular: true,
-    title: 'Batch Compress Images Free | Download All as ZIP',
-    description: 'Compress up to 50 images in one batch and download individual files or one ZIP.',
-    h1: 'Batch compress images',
-    lead: 'Apply one clear setting to a whole group, follow each file, then download everything together.',
+    title: 'Batch Compress Images | ZIP Download, No Signup',
+    description:
+      'Compress up to 50 images in one server job and download files or one ZIP. No account, no product watermark, no artificial daily quota.',
+    h1: 'Batch compress images without an account',
+    lead: 'Apply one setting to a group, watch each file, then download a ZIP. Files still upload to the same-origin processor and follow the four-hour deletion rule.',
     multiple: true,
   }),
   ...exactTools,
@@ -347,9 +378,9 @@ export const tools: ToolDefinition[] = [
     category: 'Convert',
     kind: 'convert',
     popular: true,
-    title: 'Convert Images Online Free | JPG, PNG, WebP & AVIF',
+    title: 'Convert Images | JPG, PNG, WebP, AVIF, HEIC Input',
     description:
-      'Convert images between JPG, PNG, WebP, and AVIF. HEIC, TIFF, and SVG input supported where the production codec allows.',
+      'Convert still images between JPG, PNG, WebP, and AVIF. HEIC, TIFF, and safe SVG can be inputs when the production codec allows. Animation is not flattened.',
     h1: 'Convert an image',
     lead: 'Choose the format that fits the job. Transparency gets a clear warning before JPEG conversion.',
     operation: { kind: 'convert', format: 'webp', quality: 82 },
@@ -357,7 +388,11 @@ export const tools: ToolDefinition[] = [
     notes: [
       {
         title: 'Format matters',
-        text: 'JPEG is broadly compatible for photos. PNG preserves exact pixels and alpha. WebP and AVIF usually save more bytes.',
+        text: 'JPEG is broadly compatible for photos and has no transparency. PNG preserves exact decoded pixels and alpha. WebP and AVIF usually save more bytes. Animated sources are rejected in this version.',
+      },
+      {
+        title: 'This converter uploads the file',
+        text: 'Conversion is a server job with the same four-hour deletion and Delete now behavior as compression.',
       },
     ],
     related: ['jpg-to-webp', 'png-to-jpg', 'compress-image-to-size', 'image-metadata'],
@@ -367,8 +402,8 @@ export const tools: ToolDefinition[] = [
     slug,
     category: 'Convert' as const,
     kind: 'convert' as const,
-    title: `${name} Online Free | compressimage.fun`,
-    description: `${name} with quality controls, safe temporary processing, and no signup or watermark.`,
+    title: `${name} | compressimage.fun`,
+    description: `${name} on a temporary server job. Quality controls, no signup, and no product watermark. Files auto-delete within four hours.`,
     h1: name,
     lead,
     accept: input === 'jpeg' ? 'image/jpeg,.jpg,.jpeg' : `image/${input},.${input}`,

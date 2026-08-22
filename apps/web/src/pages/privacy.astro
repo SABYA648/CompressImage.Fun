@@ -3,17 +3,21 @@ import SiteLayout from '../layouts/SiteLayout.astro';
 ---
 
 <SiteLayout
-  title="Privacy & Temporary File Processing | compressimage.fun"
-  description="Plain-language details about server processing, four-hour deletion, Delete now, browser-only Base64 tools, logs, and analytics."
+  title="Privacy, Uploads, Retention, and Analytics | compressimage.fun"
+  description="Which tools upload, which stay in the browser, four-hour deletion, Delete now, logs, Google Analytics, and optional Umami. No no-upload claim for server jobs."
   canonicalPath="/privacy"
+  breadcrumbs={[
+    { name: 'Home', path: '/' },
+    { name: 'Privacy', path: '/privacy' },
+  ]}
 >
   <header class="hero compact">
     <div class="shell">
-      <div class="eyebrow">Plain-language privacy</div><h1>Your files are temporary</h1><p
-        class="lead"
-      >
-        Server tools need the image to do the work. Browser-only tools do not upload it. Here is the
-        exact boundary.
+      <div class="eyebrow">Plain-language privacy</div>
+      <h1>Your files are temporary. Some tools never receive them.</h1>
+      <p class="lead">
+        Server tools need the image to do the work. Browser-only tools do not upload it. Analytics,
+        when built into the static site, never receives the file bytes.
       </p>
     </div>
   </header>
@@ -21,44 +25,65 @@ import SiteLayout from '../layouts/SiteLayout.astro';
     <div class="article-body">
       <p class="article-summary">
         Files processed on compressimage.fun servers are automatically deleted within four hours.
-        You can delete a completed job immediately.
+        You can delete a completed job immediately. Do not treat a server compressor as a no-upload
+        product.
       </p>
       <section>
-        <h2>Server tools</h2><p>
-          Compression, resizing, cropping, format conversion, metadata tools, watermarks, and
-          favicon generation upload images to the same-origin processing API. Each temporary job
-          uses a cryptographically random ID and a separate high-entropy access token. Files are
-          stored under random internal names, not your filename.
-        </p><p>
+        <h2>Server tools (these upload)</h2>
+        <p>
+          Compression, exact-size presets, batch ZIP, resize, crop, rotate, format conversion,
+          metadata inspect/remove, form-photo and signature preparation, watermarks, and favicon
+          generation upload images to the same-origin processing API. Each temporary job uses a
+          cryptographically random ID and a separate high-entropy access token. Files are stored
+          under random internal names, not your filename.
+        </p>
+        <p>
           The source, outputs, small private previews, and safe job metadata live in an isolated
           processor volume. A cleanup task runs at startup and periodically. Delete now removes the
           complete job directory immediately.
         </p>
       </section>
       <section>
-        <h2>Browser tools</h2><p>
-          Image to Base64, Base64 to Image, Base64 Image Viewer, and Image to Data URI run in
-          browser memory. Their file or pasted value is not sent to the processing API. The tools
-          also set input limits to avoid freezing your tab.
+        <h2>Browser tools (these do not upload the file)</h2>
+        <p>
+          Image to Base64, Base64 to Image, Base64 Image Viewer, Image to Data URI, Image to PDF,
+          and Image Color Picker run in browser memory. Their file or pasted value is not sent to
+          the processing API. They still load ordinary page assets and, if analytics is enabled,
+          page-view scripts.
         </p>
       </section>
       <section>
-        <h2>Logs</h2><p>
+        <h2>Logs</h2>
+        <p>
           Operational logs may contain a request ID, tool ID, format, coarse size bucket, duration,
           and a controlled error category. They do not intentionally contain image bytes, Base64
           data, GPS values, access tokens, result URLs, or full original filenames.
         </p>
       </section>
       <section>
-        <h2>Analytics</h2><p>
-          Analytics is off when no measurement ID is configured. If enabled later, the event layer
-          sends only controlled categories such as tool ID, format, file-count bucket, and
-          processing result. Filenames, image contents, EXIF, job IDs, access tokens, and free-form
-          errors are excluded.
+        <h2>Analytics</h2>
+        <p>
+          The public site may include Google Analytics 4 when <code>PUBLIC_GA_MEASUREMENT_ID</code>
+          is present at Docker build time. Production inspected on 22 August 2026 loaded
+          measurement ID <code>G-W530RG17S3</code> with <code>anonymize_ip</code> and
+          <code>allow_google_signals: false</code>. That is usage analytics, not file processing.
+        </p>
+        <p>
+          Umami loads only when <code>PUBLIC_UMAMI_WEBSITE_ID</code> is set at build time. Local
+          Docker builds without those variables do not inject analytics scripts. The typed event
+          layer sends only controlled categories such as tool ID, format, file-count bucket, and
+          processing result. Filenames, image contents, EXIF, job IDs, access tokens, result URLs,
+          and free-form errors are excluded.
+        </p>
+        <p>
+          If a measurement ID is built in, a page view can still tell Google or Umami that a public
+          URL was opened, along with ordinary browser and network metadata those products collect.
+          That is not the same as storing your image. It is also not “analytics off.”
         </p>
       </section>
       <section>
-        <h2>What metadata removal cannot do</h2><p>
+        <h2>What metadata removal cannot do</h2>
+        <p>
           Removing EXIF and GPS fields does not hide information visible in the pixels. Faces,
           signs, reflections, and document text may still reveal private details.
         </p>

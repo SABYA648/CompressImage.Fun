@@ -1,0 +1,116 @@
+---
+import SiteLayout from '../layouts/SiteLayout.astro';
+import { compressionEvidence } from '../data/compression-evidence';
+
+const rows = compressionEvidence.rows;
+const kb = (bytes?: number) =>
+  typeof bytes === 'number' ? `${(bytes / 1024).toFixed(1)} KB` : 'n/a';
+---
+
+<SiteLayout
+  title="Exact-Size Compression Tests | Open Fixtures"
+  description="Reproducible exact-size compression measurements from synthetic openly generated fixtures. Bytes, dimensions, quality, and search iterations, with visual-quality limits disclosed."
+  canonicalPath="/compression-tests"
+  pageType="article"
+  h1="Exact-size compression tests"
+  breadcrumbs={[
+    { name: 'Home', path: '/' },
+    { name: 'Compression tests', path: '/compression-tests' },
+  ]}
+>
+  <header class="hero compact">
+    <div class="shell">
+      <div class="eyebrow">Original measurements</div>
+      <h1>What the exact-size engine did on our fixtures</h1>
+      <p class="lead">
+        These numbers come from the same optimizer the site uses. They are not a promise about your
+        camera JPEG, a passport photo, or a competitor comparison.
+      </p>
+    </div>
+  </header>
+  <article class="article shell">
+    <div class="article-body">
+      <p class="article-summary">
+        Generated: {compressionEvidence.generatedAt}. Engine: {compressionEvidence.engine}. Minimum
+        quality {compressionEvidence.settings.minQuality}. Metadata is stripped.
+      </p>
+      <section>
+        <h2>Fixtures and license</h2>
+        <p>{compressionEvidence.settings.fixtures}</p>
+        <p>
+          Reproduce with <code>npm run benchmark:exact</code> inside the production-equivalent
+          Docker build image, then <code>node scripts/publish-compression-evidence.mjs</code>.
+        </p>
+      </section>
+      <section>
+        <h2>Visual quality limitation</h2>
+        <p>{compressionEvidence.visualQualityLimitation}</p>
+        <p>
+          Compare your own file with the on-page before/after slider. A smaller byte count can still
+          look wrong on faces, hair, and small type.
+        </p>
+      </section>
+      <section>
+        <h2>Results</h2>
+        {
+          rows.length === 0 ? (
+            <p>
+              No published rows yet in this build. Run the Docker evidence publisher before treating
+              this table as measured.
+            </p>
+          ) : (
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fixture</th>
+                    <th>Input</th>
+                    <th>Cap</th>
+                    <th>Output</th>
+                    <th>Pixels</th>
+                    <th>Quality</th>
+                    <th>Iterations</th>
+                    <th>ms</th>
+                    <th>Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {
+                    rows.map((row) => (
+                      <tr>
+                        <td>{row.fixture}</td>
+                        <td>{kb(row.inputBytes)}</td>
+                        <td>{row.targetKB} KB</td>
+                        <td>{row.success ? kb(row.outputBytes) : 'no fit'}</td>
+                        <td>
+                          {row.width && row.height ? `${row.width}×${row.height}` : 'n/a'}
+                        </td>
+                        <td>{row.quality ?? 'n/a'}</td>
+                        <td>{row.iterations ?? 'n/a'}</td>
+                        <td>{row.elapsedMs ?? 'n/a'}</td>
+                        <td>{row.note}</td>
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      </section>
+      <section>
+        <h2>How to read a row</h2>
+        <ul>
+          <li>Output at or below the cap is success. Padding never happens.</li>
+          <li>Unchanged dimensions mean quality search was enough.</li>
+          <li>Smaller dimensions mean the cap required the scale walk.</li>
+          <li>Elapsed time is wall-clock on the machine that ran the script, not a product SLA.</li>
+        </ul>
+        <p>
+          Custom caps belong on <a href="/compress-image-to-size">compress to any KB or MB</a>.
+          Named 20 KB through 1 MB pages only prefill those six values.
+        </p>
+      </section>
+    </div>
+  </article>
+</SiteLayout>
