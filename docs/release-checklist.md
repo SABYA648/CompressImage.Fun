@@ -6,7 +6,7 @@ Measurements and commands behind every checked line are in `docs/test-evidence.m
 
 - [x] Fresh `npm ci`, type check, lint, format check, and content lint
 - [x] Unit, security, and engine tests: 9 passing
-- [x] Static build: 52 pages
+- [x] Static build: 74 pages
 - [x] Health and readiness endpoints respond correctly
 - [x] Smart, exact target, resize, convert, metadata, favicon, passport, signature, Base64, PDF, colour picker, chaining, download, and Delete now flows
 - [x] Every processed result decoded and checked against its declared format
@@ -19,18 +19,25 @@ Measurements and commands behind every checked line are in `docs/test-evidence.m
 - [x] Jobs survive a processor restart on the same storage directory
 - [x] Delete now removes the job directory from disk, not just from the UI
 - [x] Temporary results carry `private, no-store` and `nosniff`
-- [x] SEO crawl over 51 canonical URLs, sitemap, robots, and llms.txt
-- [x] Playwright Chromium: 45 specs including keyboard, mobile widths, and browser-local privacy
+- [x] SEO crawl over 73 canonical URLs plus page/image sitemaps, RSS, robots, and llms.txt
+- [x] All 38 tool pages expose five useful stories; all 30 guides embed a working tool
+- [x] Useful animated 404 preserves status 404, is noindex, and contains the working compressor
+- [x] Playwright Chromium: 54 specs including keyboard, mobile widths, browser-local privacy, guide tools, and 404 recovery
+- [x] Dedicated accessibility/responsive run: 31 passing
 - [x] Browser-local tools confirmed to make zero API requests
 - [x] Compression and exact-size benchmarks recorded
-- [x] Eight-job mixed concurrency probe
-- [x] Lighthouse on six routes: performance, accessibility, and SEO all 100
+- [x] Eight-job mixed concurrency probe: 8/8 in 5.32 seconds
+- [x] Lighthouse on six routes: performance 88-100, accessibility 100, SEO 100, CLS 0
+- [x] Lighthouse Best Practices 78 is limited by expected local HTTP/HTTPS audits; production TLS remains a deployment check
+- [x] Visual QA: 16 states at 375-1920 px, expected status, no horizontal overflow
 - [x] Repository sweep for developer paths, placeholders, and stray files
-- [x] Production Docker image build (`docker compose build --pull`)
+- [x] Production and QA Docker images rebuilt with `--pull --no-cache`
 - [x] Compose startup: `processor` and `web` healthy; `e2e` not started
 - [x] Live Nginx security headers on HTML, static assets, and `/api/`
 - [x] HEIC decoder verified inside the real processor container
 - [x] Production Compose publishes no host port; local overlay is localhost-only
+- [x] Release smoke: 34/34 including real HEIC/AVIF, persistence, delete, security, isolation, and TTL
+- [x] TTL returned to 14,400 seconds after the disposable 60-second cleanup test
 
 ## Remaining non-blockers
 

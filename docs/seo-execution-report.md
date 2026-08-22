@@ -85,16 +85,16 @@ Measured mobile Lighthouse results against local production Docker:
 
 | Route                                              | Performance | Accessibility | Best Practices | SEO |      LCP |    TBT | CLS |
 | -------------------------------------------------- | ----------: | ------------: | -------------: | --: | -------: | -----: | --: |
-| `/`                                                |         100 |           100 |             78 | 100 | 1,502 ms |   0 ms |   0 |
-| `/compress-image-to-50kb`                          |          99 |           100 |             78 | 100 | 1,826 ms |  84 ms |   0 |
-| `/resize-image`                                    |         100 |           100 |             78 | 100 | 1,353 ms |  85 ms |   0 |
-| `/image-to-base64`                                 |          87 |           100 |             78 | 100 | 2,124 ms | 486 ms |   0 |
-| `/guides/how-to-compress-image-to-exact-file-size` |          99 |           100 |             78 | 100 | 1,806 ms |  23 ms |   0 |
-| `/tools`                                           |         100 |           100 |             78 | 100 |   901 ms |  24 ms |   0 |
+| `/`                                                |          88 |           100 |             78 | 100 | 1,801 ms | 449 ms |   0 |
+| `/compress-image-to-50kb`                          |          91 |           100 |             78 | 100 | 1,956 ms | 338 ms |   0 |
+| `/resize-image`                                    |          98 |           100 |             78 | 100 | 1,955 ms | 112 ms |   0 |
+| `/image-to-base64`                                 |         100 |           100 |             78 | 100 | 1,505 ms |  39 ms |   0 |
+| `/guides/how-to-compress-image-to-exact-file-size` |         100 |           100 |             78 | 100 | 1,503 ms |   0 ms |   0 |
+| `/tools`                                           |         100 |           100 |             78 | 100 | 1,708 ms |  61 ms |   0 |
 
 Best Practices is limited by the production-equivalent local endpoint using HTTP and not redirecting HTTP to HTTPS. TLS and HTTP-to-HTTPS redirection belong to the separately authorized Coolify/domain phase. The score is not presented as 100.
 
-The browser-local Base64 workspace remains the largest measured interaction bundle and is the clearest future performance target. It still meets the product privacy boundary by making no processing API upload.
+The browser-local Image-to-PDF workspace remains the largest lazy-loaded interaction bundle and is the clearest future payload target. It still meets the product privacy boundary by making no processing API upload.
 
 ## Analytics and measurement boundary
 

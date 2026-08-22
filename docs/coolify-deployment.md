@@ -19,11 +19,11 @@ deployment and proxy networking.
 
 ## Domains (Coolify UI)
 
-| Service     | Domains                         |
-| ----------- | ------------------------------- |
-| `processor` | blank (no domain)               |
+| Service     | Domains                          |
+| ----------- | -------------------------------- |
+| `processor` | blank (no domain)                |
 | `web`       | `https://compressimage.fun:8080` |
-| `e2e`       | blank (no domain)               |
+| `e2e`       | blank (no domain)                |
 
 The `:8080` in Coolify's domain field is the **internal container target port**.
 It tells Coolify's reverse proxy to forward to port 8080 inside the `web`
@@ -69,10 +69,10 @@ is intentional. Only `/data/jobs` needs to be writable.
 
 ## Health
 
-| Item          | Value             |
-| ------------- | ----------------- |
+| Item          | Value              |
+| ------------- | ------------------ |
 | Health path   | `/health` on `web` |
-| Expected body | `{"status":"ok"}` |
+| Expected body | `{"status":"ok"}`  |
 
 Configure Coolify's health check against `/health` on the `web` service only.
 `/health` is answered locally by Nginx and does not call the processor.

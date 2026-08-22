@@ -1,5 +1,186 @@
 # Test evidence
 
+## Current production-equivalent local Docker gate (2026-08-23)
+
+This is the current release record. Older evidence is retained below as history.
+
+### Revisions and environment
+
+| Property                    | Value                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------- |
+| Application revision        | `becafc6c68ad4ede0d43b7377f0eae25135b8a1f` (`feat: revamp image tools and expand search content`) |
+| Validation-harness revision | `1475d6443b94209cd2062f6b27a9db5c731e004b` (`test: wait for guide tool hydration`)                |
+| Host                        | Darwin 25.5.0, arm64; Docker Desktop Linux VM                                                     |
+| Docker                      | Client/server 29.6.2; host Compose v5.3.1; QA-image Compose v2.40.3                               |
+| Local service limits        | processor 3.5 CPUs, 12 GiB memory, concurrency 2; read-only roots; all capabilities dropped       |
+| Local edge                  | `127.0.0.1:8080` only; processor has no host binding                                              |
+
+The production images were built from the application revision. The subsequent harness revision changes one Playwright wait only and does not alter either production image. The evidence documentation commit is intentionally not used as its own source identifier.
+
+### Exact commands
+
+All project tooling below ran inside Docker. Host commands were limited to Git, repository inspection, Docker orchestration, and artifact inspection.
+
+```sh
+docker compose --profile qa build --pull --no-cache
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --wait
+
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile qa run --rm --no-deps e2e sh -lc \
+  'npm audit --omit=dev && npm run typecheck && npm run lint && npm run format:check && npm run content:lint && npm test && npm run build'
+
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile qa run --rm --no-deps e2e npm run test:seo
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile qa run --rm --no-deps -v "$PWD/artifacts:/app/artifacts" e2e npm run test:e2e
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile qa run --rm --no-deps e2e npm run test:a11y
+
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile qa run --rm --no-deps \
+  -v "$PWD/artifacts:/app/artifacts" e2e sh -lc \
+  'npm run benchmark:compression && npm run benchmark:exact && npm run test:load'
+
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile qa run --rm --no-deps \
+  -v "$PWD/artifacts:/app/artifacts" e2e sh -lc \
+  'npm run test:lighthouse && npm run test:visual'
+
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile qa run --rm --no-deps \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$PWD/artifacts:/app/artifacts" \
+  -e COMPOSE_PROJECT_NAME=compressimagefun \
+  e2e node scripts/release-smoke.mjs
+```
+
+The five-run no-retry regression used after fixing the guide hydration race was:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile qa run --rm --no-deps \
+  e2e npx playwright test tests/e2e/core.spec.ts \
+  --grep "every tool page pattern" --retries=0 --repeat-each=5 --workers=1
+```
+
+### Image identifiers
+
+The clean no-cache production images are:
+
+| Image                               | Identifier                                                                |          Size |
+| ----------------------------------- | ------------------------------------------------------------------------- | ------------: |
+| `compressimagefun-web:latest`       | `sha256:a4b299fb161aa572adf6a1bf12bd2c35ad21b846a92718301d09a20875bbbe55` |  27,769,120 B |
+| `compressimagefun-processor:latest` | `sha256:7a8b5ccbc3c561db3672f0fdf32357125030b83161df852dce068e9c408f7fa4` | 195,924,617 B |
+
+The final QA image after the validation-only hydration wait is `sha256:2ba3261c5dfe7e2f2c7d2863c0c161e3b27a445ed0e3be2447df7b736a2cfa92` (1,266,250,840 B). It contains browser, codec-fixture, Docker CLI, and Compose dependencies that never enter production images.
+
+### Gate results
+
+| Gate                     | Actual result                                                                                                                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fresh install/build      | PASS: `--pull --no-cache`; fresh `npm ci` installed 675 packages and audited 678 with 0 vulnerabilities; production prune audited 362 with 0 vulnerabilities                                                           |
+| Compose/health           | PASS: processor and web healthy; QA service not started persistently                                                                                                                                                   |
+| Runtime contract         | PASS: processor 3.5 CPUs/12 GiB, read-only root, `cap_drop: ALL`, no port binding; web read-only, `cap_drop: ALL`, localhost-only test binding                                                                         |
+| Type/lint/format/content | PASS: Astro 30 files, 0 errors/warnings/hints; ESLint 0 warnings; Prettier clean; content lint 28 source files                                                                                                         |
+| Unit/security/engine     | PASS: 4 files, 9 tests                                                                                                                                                                                                 |
+| Static build             | PASS: 74 pages                                                                                                                                                                                                         |
+| SEO crawl                | PASS: 73 canonical URLs; unique metadata, one H1, canonical, Open Graph, parseable JSON-LD; page/image sitemaps, RSS, robots, and llms.txt                                                                             |
+| Story/tool integration   | PASS: five distinct stories on each of 38 tools; complete working tool in each of 30 guides                                                                                                                            |
+| Useful 404               | PASS: real 404 status, noindex, animation, and a working compressor                                                                                                                                                    |
+| Chromium E2E             | PASS: 54/54, no retry in the final run                                                                                                                                                                                 |
+| Accessibility/responsive | PASS: 31/31; keyboard paths and no horizontal overflow at required widths                                                                                                                                              |
+| Visual QA                | PASS: 16/16 states, expected 200/404 status, widths 375-1920, no overflow                                                                                                                                              |
+| Compression/exact        | PASS: outputs decoded; all 12 exact-target rows at or below cap                                                                                                                                                        |
+| Mixed load               | PASS: 8/8 ordinary concurrent jobs in 5.32 s at processor concurrency 2                                                                                                                                                |
+| Release smoke            | PASS: 34/34                                                                                                                                                                                                            |
+| Persistence/delete       | PASS: download survived processor restart; Delete now returned 204, then job/download 404 and directory absent                                                                                                         |
+| TTL/startup cleanup      | PASS: disposable 60-second TTL job became job/download 404 and directory absent; normal 14,400-second TTL restored in `finally`                                                                                        |
+| HEIC/AVIF                | PASS: real HEVC HEIC to JPG/WebP/exact; libde265 decoder listed in processor; AVIF encode, preserve-format, and exact 50 KB                                                                                            |
+| Security boundaries      | PASS: capability authorization/hostile-input unit and API cases, HTML/static/API headers, private/no-store download, noindex API, processor isolation                                                                  |
+| Repository sweep         | PASS after review: hits are canonical prompt literals, lint rules, local-Docker documentation, or historical evidence; no public placeholders, developer paths, fake analytics IDs, private keys, or hardcoded secrets |
+
+No required local gate was skipped. Firefox and WebKit are not configured in this repository and remain a documented non-blocking expansion; the required production-equivalent Chromium gate passed. TLS, domain routing, real Search Console/Bing ownership, and physical iPhone/Android uploads are inherently post-deployment owner checks and were not represented as local successes.
+
+### Release-smoke detail
+
+`scripts/release-smoke.mjs` passed 34 of 34 checks. It covered health/readiness, JPEG/PNG/WebP/AVIF, real HEIC decode, exact-size output, resize, batch, metadata removal, real result headers, persistence, delete, TTL cleanup, HTML/static/API security headers, processor port isolation, and representative SEO routes.
+
+Representative measured results:
+
+| Workflow          | Result                                                                         |
+| ----------------- | ------------------------------------------------------------------------------ |
+| JPEG smart        | 945,343 B to 532,114 B, 1400x900                                               |
+| Exact JPEG 50 KB  | 50,646 B                                                                       |
+| JPEG to AVIF      | 234,690 B in 3,013 ms, AV1 verified                                            |
+| AVIF exact 50 KB  | 48,047 B in 24,139 ms                                                          |
+| HEIC to JPG       | 606,603 B, 1400x900                                                            |
+| HEIC exact 100 KB | 101,785 B, 952x612                                                             |
+| TTL               | pre-expiry 200; after 65 seconds/restart job 404, download 404, directory gone |
+
+### Compression benchmark
+
+Synthetic fixture, single encoder operation in the QA container:
+
+| Fixture                    | Output            |     Bytes |       Time |
+| -------------------------- | ----------------- | --------: | ---------: |
+| photograph.jpg, 945,343 B  | JPEG q82          |   532,114 |   183.6 ms |
+| photograph.jpg             | PNG               | 3,758,751 |   987.9 ms |
+| photograph.jpg             | WebP q80          |   547,186 |   992.6 ms |
+| photograph.jpg             | AVIF q50 effort 3 |   234,057 | 2,478.7 ms |
+| illustration.png, 24,350 B | JPEG q82          |    16,765 |    23.7 ms |
+| illustration.png           | PNG               |     7,643 |    79.3 ms |
+| illustration.png           | WebP q80          |     6,942 |    49.2 ms |
+| illustration.png           | AVIF q50 effort 3 |     3,792 |   223.6 ms |
+
+PNG is intentionally not presented as a good photographic conversion: the benchmark shows the large result rather than hiding it.
+
+### Exact-size benchmark
+
+| Photograph target |    Output | Dimensions | Quality | Encodes |       Time |
+| ----------------: | --------: | ---------: | ------: | ------: | ---------: |
+|             20 KB |  20,335 B |    336x216 |      55 |      56 | 3,030.3 ms |
+|             50 KB |  50,646 B |    616x396 |      45 |      41 | 2,437.3 ms |
+|            100 KB | 101,815 B |    952x612 |      39 |      26 | 1,854.5 ms |
+|            200 KB | 202,738 B |   1288x828 |      43 |      11 |   998.1 ms |
+|            500 KB | 508,334 B |   1400x900 |      80 |       6 |   529.9 ms |
+|              1 MB | 950,389 B |   1400x900 |      95 |       6 |   749.6 ms |
+
+The PNG illustration produced 16,508 B at its original 900x600 dimensions for every 20 KB through 1 MB target. All 12 rows reported success at or below the requested byte cap.
+
+### Lighthouse
+
+Mobile emulation against local production Docker:
+
+| Route                                              | Perf | A11y |  BP | SEO |      LCP |    TBT | CLS |
+| -------------------------------------------------- | ---: | ---: | --: | --: | -------: | -----: | --: |
+| `/`                                                |   88 |  100 |  78 | 100 | 1,801 ms | 449 ms |   0 |
+| `/compress-image-to-50kb`                          |   91 |  100 |  78 | 100 | 1,956 ms | 338 ms |   0 |
+| `/resize-image`                                    |   98 |  100 |  78 | 100 | 1,955 ms | 112 ms |   0 |
+| `/image-to-base64`                                 |  100 |  100 |  78 | 100 | 1,505 ms |  39 ms |   0 |
+| `/guides/how-to-compress-image-to-exact-file-size` |  100 |  100 |  78 | 100 | 1,503 ms |   0 ms |   0 |
+| `/tools`                                           |  100 |  100 |  78 | 100 | 1,708 ms |  61 ms |   0 |
+
+Best Practices is 78 because Lighthouse flags the intentional local HTTP endpoint and absence of an HTTP-to-HTTPS redirect. Coolify TLS/domain behavior was not tested because deployment was explicitly out of scope.
+
+### Frontend payload
+
+The production Nginx image contains 2,720 KiB of static site files and 528 KiB under `_astro`. Largest uncompressed interaction assets:
+
+| Asset                   |   Bytes | Loading boundary              |
+| ----------------------- | ------: | ----------------------------- |
+| ImageToPdfWorkspace JS  | 427,883 | lazy, Image-to-PDF pages only |
+| SiteLayout CSS          |  28,121 | global                        |
+| ToolWorkspace JS        |  24,568 | tool islands                  |
+| Preact runtime          |  10,470 | hydrated tools                |
+| Base64Workspace JS      |   8,319 | Base64 pages only             |
+| ColorPickerWorkspace JS |   5,552 | color picker only             |
+
+### Failures found and fixed during this gate
+
+- QA image lacked compiled processor/static artifacts for standalone exact benchmark and content lint commands. The QA stage now runs the full build.
+- The TTL harness polled Nginx `/health`, which remains 200 while a recreated processor starts. It now waits on proxied `/ready` and always restores the normal TTL in `finally`.
+- Docker's internal exposed-port metadata was mistaken for a host publish. The smoke now inspects `HostConfig.PortBindings`; the actual map is empty.
+- One `client:visible` guide test selected a file before React hydration on its first attempt. The test now waits for Astro's SSR marker to clear; it then passed five no-retry repetitions and the complete 54-test no-retry final run.
+- Result-download `X-Robots-Tag` was previously represented by a placeholder assertion. The smoke now checks the real download header and measured `noindex, nofollow, noarchive`.
+
+### Coolify readiness
+
+`READY FOR COOLIFY DEPLOYMENT`
+
+There are no remaining local release blockers. The owner did not authorize or request a Coolify deployment in this task, so no Coolify, VPS, DNS, TLS, secret, volume, or running production service was changed. A later deployment task must reconfirm the application revision and image/Compose contract, then perform only the bounded production smoke described in `AGENTS.md` and `docs/coolify-deployment.md`.
+
 Evidence below was produced on 2026-08-09 in the release-hardening environment, on
 the commit recorded at the bottom of this page. Every row states what was actually
 run and where. A row marked BLOCKED is not evidence of success.
@@ -67,7 +248,7 @@ Nginx runtime, and the Compose health wiring; those are listed as BLOCKED.
 | Absolute paths / placeholders | Repository grep                                                                                                | PASS: no developer machine paths outside the quoted rules in `BUILD_PROMPT.md`; no lorem ipsum or placeholder copy.                                                                              |
 | Docker image build            | `docker compose build --pull`                                                                                  | BLOCKED, re-confirmed in the later Docker verification pass. Not a repository defect. Detail below.                                                                                              |
 | Compose health wiring         | `docker compose up`                                                                                            | BLOCKED: same cause. `docker compose config` (no pull required) validates cleanly. Detail below.                                                                                                 |
-| Nginx runtime headers         | Response headers from the real Nginx                                                                           | BLOCKED: same cause. `docker/nginx.conf` was reviewed and corrected by inspection. No change needed in the Docker verification pass.                                                            |
+| Nginx runtime headers         | Response headers from the real Nginx                                                                           | BLOCKED: same cause. `docker/nginx.conf` was reviewed and corrected by inspection. No change needed in the Docker verification pass.                                                             |
 | HEIC decoder packaging        | `apt-cache depends`, then a real `heif-enc`/`heif-convert` A/B decode test on the host, no registry needed     | Gap found, fixed, and functionally proven on a same-family distro. Still not run inside the actual container. Detail below.                                                                      |
 
 ## Fixed during this pass
@@ -121,7 +302,7 @@ this sandbox). Once running:
   specifically, remain blocked from this session.
 - Per policy, downloads were not retried beyond the two required base images plus
   the one general-purpose check above. `docker compose build`, `docker compose
-  up`, in-container HEIC/AVIF verification, storage-restart verification, live
+up`, in-container HEIC/AVIF verification, storage-restart verification, live
   Nginx headers, and the compact Docker browser smoke could therefore not run.
   These remain BLOCKED, exactly as the prior pass reported.
 
@@ -291,7 +472,7 @@ rather than trusting the file extension.
   images, confirmed as an organization policy denial rather than a transient
   failure (see "Docker verification pass" above). The Dockerfile and Nginx
   changes are reviewed but still not run.
-- Behaviour of the HEIC path inside the *built image specifically*. The
+- Behaviour of the HEIC path inside the _built image specifically_. The
   application mechanism is verified natively with the same processor code and
   the same `heif-convert` tool. The Docker verification pass additionally found
   that the processor image's package list was missing the HEVC decoder plugin,
@@ -340,34 +521,34 @@ instead of `--version` (not portable across libheif 1.15).
 
 ### Gates (this pass)
 
-| Gate | Command / method | Result |
-| ---- | ---------------- | ------ |
-| Docker build | `docker compose build --pull` | PASS: `processor` and `web` built |
-| Compose up | `docker compose up -d` then local overlay for QA | PASS: processor healthy, web healthy, e2e absent |
-| Health | `GET http://127.0.0.1:8080/health` and `/ready` | PASS: `{"status":"ok"}`, ready with queueDepth 0 |
-| HEIC in container | HEIC→JPG, HEIC→WebP, HEIC exact 100 KB via `/api/jobs` | PASS: 1400×900 decode, outputs valid, exact ≤ 100 KB (101732 B at 952×612) |
-| AVIF | JPEG→AVIF, preserve-format, exact 50 KB | PASS: av1 compression, no JPEG fallback, 48016 B in 17.5 s |
-| Core smoke | JPEG, exact 50 KB, PNG, WebP, resize, batch, metadata remove, download | PASS |
-| Persistence | process → restart processor → download | PASS |
-| Delete now | DELETE → 404 job/download → directory gone | PASS: 204 then gone |
-| TTL | `FILE_TTL_SECONDS=60`, wait 65 s, restart cleanup | PASS: job 404, download 404, directory gone; restored to 14400 |
-| Security headers | live Nginx HTML / CSS / `/api/` | PASS: nosniff, DENY, CSP, API `private, no-store` + `noindex` |
-| Processor isolation | `docker compose port processor 3000` | PASS: no published host port |
-| Browser-local | Playwright Base64 encode/decode/viewer, color picker, Image to PDF | PASS: zero `/api/` requests |
-| Compact Chromium | `tests/e2e/release-smoke.spec.ts` (6) | PASS: homepage, 50 KB, HEIC, AVIF, Base64 privacy, 390 px |
-| SEO runtime | `/`, robots, sitemap-index, llms, representative pages | PASS: all 200 |
-| Lighthouse | `npm run test:lighthouse` vs Docker web | PASS: all six routes Performance/A11y/BP/SEO = 100 |
+| Gate                | Command / method                                                       | Result                                                                     |
+| ------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Docker build        | `docker compose build --pull`                                          | PASS: `processor` and `web` built                                          |
+| Compose up          | `docker compose up -d` then local overlay for QA                       | PASS: processor healthy, web healthy, e2e absent                           |
+| Health              | `GET http://127.0.0.1:8080/health` and `/ready`                        | PASS: `{"status":"ok"}`, ready with queueDepth 0                           |
+| HEIC in container   | HEIC→JPG, HEIC→WebP, HEIC exact 100 KB via `/api/jobs`                 | PASS: 1400×900 decode, outputs valid, exact ≤ 100 KB (101732 B at 952×612) |
+| AVIF                | JPEG→AVIF, preserve-format, exact 50 KB                                | PASS: av1 compression, no JPEG fallback, 48016 B in 17.5 s                 |
+| Core smoke          | JPEG, exact 50 KB, PNG, WebP, resize, batch, metadata remove, download | PASS                                                                       |
+| Persistence         | process → restart processor → download                                 | PASS                                                                       |
+| Delete now          | DELETE → 404 job/download → directory gone                             | PASS: 204 then gone                                                        |
+| TTL                 | `FILE_TTL_SECONDS=60`, wait 65 s, restart cleanup                      | PASS: job 404, download 404, directory gone; restored to 14400             |
+| Security headers    | live Nginx HTML / CSS / `/api/`                                        | PASS: nosniff, DENY, CSP, API `private, no-store` + `noindex`              |
+| Processor isolation | `docker compose port processor 3000`                                   | PASS: no published host port                                               |
+| Browser-local       | Playwright Base64 encode/decode/viewer, color picker, Image to PDF     | PASS: zero `/api/` requests                                                |
+| Compact Chromium    | `tests/e2e/release-smoke.spec.ts` (6)                                  | PASS: homepage, 50 KB, HEIC, AVIF, Base64 privacy, 390 px                  |
+| SEO runtime         | `/`, robots, sitemap-index, llms, representative pages                 | PASS: all 200                                                              |
+| Lighthouse          | `npm run test:lighthouse` vs Docker web                                | PASS: all six routes Performance/A11y/BP/SEO = 100                         |
 
 ### Lighthouse (Docker-hosted)
 
-| Route | Perf | A11y | BP | SEO | LCP | TBT | CLS |
-| ----- | ---- | ---- | -- | --- | --- | --- | --- |
-| / | 100 | 100 | 100 | 100 | 1652 ms | 0 | 0 |
-| /compress-image-to-50kb | 100 | 100 | 100 | 100 | 1653 ms | 0 | 0 |
-| /resize-image | 100 | 100 | 100 | 100 | 1502 ms | 0 | 0 |
-| /image-to-base64 | 100 | 100 | 100 | 100 | 1352 ms | 0 | 0 |
-| /guides/how-to-compress-image-to-exact-file-size | 100 | 100 | 100 | 100 | 901 ms | 0 | 0 |
-| /tools | 100 | 100 | 100 | 100 | 1051 ms | 0 | 0 |
+| Route                                            | Perf | A11y | BP  | SEO | LCP     | TBT | CLS |
+| ------------------------------------------------ | ---- | ---- | --- | --- | ------- | --- | --- |
+| /                                                | 100  | 100  | 100 | 100 | 1652 ms | 0   | 0   |
+| /compress-image-to-50kb                          | 100  | 100  | 100 | 100 | 1653 ms | 0   | 0   |
+| /resize-image                                    | 100  | 100  | 100 | 100 | 1502 ms | 0   | 0   |
+| /image-to-base64                                 | 100  | 100  | 100 | 100 | 1352 ms | 0   | 0   |
+| /guides/how-to-compress-image-to-exact-file-size | 100  | 100  | 100 | 100 | 901 ms  | 0   | 0   |
+| /tools                                           | 100  | 100  | 100 | 100 | 1051 ms | 0   | 0   |
 
 ### Coolify settings proven by this pass
 
