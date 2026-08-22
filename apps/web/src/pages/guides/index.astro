@@ -21,7 +21,12 @@ import { guides } from '../../data/guides';
     <div class="guide-grid">
       {
         guides.map((guide) => (
-          <a class="guide-card" href={`/guides/${guide.slug}`}>
+          <a
+            class="guide-card"
+            href={`/guides/${guide.slug}`}
+            data-umami-event="Guide Card Click"
+            data-umami-event-guide={guide.slug}
+          >
             <>
               <small>{guide.readMinutes} minute read</small>
               <h2>{guide.title}</h2>

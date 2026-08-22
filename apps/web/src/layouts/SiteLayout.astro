@@ -121,18 +121,18 @@ const schema =
     ></script>
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to main content</a>
+    <a class="skip-link" href="#main" data-umami-event="Skip to Main Content">Skip to main content</a>
     <header class="site-header">
       <div class="shell header-inner">
-        <a class="brand" href="/" aria-label="compressimage.fun home">
+        <a class="brand" href="/" aria-label="compressimage.fun home" data-umami-event="Header Brand Click">
           <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
           <span>compressimage<span>.fun</span></span>
         </a>
         <nav aria-label="Main navigation">
-          <a href="/tools">All tools</a>
-          <a href="/compress-image-to-size">Exact size</a>
-          <a href="/guides">Guides</a>
-          <a href="/privacy">Privacy</a>
+          <a href="/tools" data-umami-event="Nav Click: All Tools">All tools</a>
+          <a href="/compress-image-to-size" data-umami-event="Nav Click: Exact Size">Exact size</a>
+          <a href="/guides" data-umami-event="Nav Click: Guides">Guides</a>
+          <a href="/privacy" data-umami-event="Nav Click: Privacy">Privacy</a>
         </nav>
       </div>
     </header>
@@ -141,7 +141,7 @@ const schema =
     <footer class="site-footer">
       <div class="shell footer-grid">
         <div>
-          <a class="brand footer-brand" href="/">compressimage<span>.fun</span></a>
+          <a class="brand footer-brand" href="/" data-umami-event="Footer Brand Click">compressimage<span>.fun</span></a>
           <p>Drop an image. Get exactly what you need.</p>
           <p class="muted">No account, no watermark, no artificial daily limit.</p>
         </div>
@@ -151,7 +151,7 @@ const schema =
             {
               popular.map((tool) => (
                 <li>
-                  <a href={toolPath(tool)}>{tool.h1}</a>
+                  <a href={toolPath(tool)} data-umami-event="Footer Popular Tool Click" data-umami-event-tool={tool.id}>{tool.h1}</a>
                 </li>
               ))
             }
@@ -160,10 +160,10 @@ const schema =
         <div>
           <h2>Project</h2>
           <ul>
-            <li><a href="/privacy">Privacy</a></li>
-            <li><a href="/guides">Guides</a></li>
-            <li><a href="/tools">Tool index</a></li>
-            <li><a href="/llms.txt">llms.txt</a></li>
+            <li><a href="/privacy" data-umami-event="Footer Link Click: Privacy">Privacy</a></li>
+            <li><a href="/guides" data-umami-event="Footer Link Click: Guides">Guides</a></li>
+            <li><a href="/tools" data-umami-event="Footer Link Click: Tools">Tool index</a></li>
+            <li><a href="/llms.txt" data-umami-event="Footer Link Click: llms.txt">llms.txt</a></li>
           </ul>
         </div>
       </div>

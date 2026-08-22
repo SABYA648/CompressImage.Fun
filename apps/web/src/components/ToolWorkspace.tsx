@@ -125,13 +125,19 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
     setError('');
     track('file_selected', {
       tool_id: tool.id,
+      file_count: selected.length,
       file_count_bucket: selected.length === 1 ? '1' : selected.length <= 10 ? '2-10' : '11+',
+      total_bytes: selected.reduce((sum, f) => sum + f.size, 0),
     });
   };
 
   const removeFile = (url: string): void => {
     URL.revokeObjectURL(url);
-    setFiles((current) => current.filter((item) => item.url !== url));
+    setFiles((current) => {
+      const remaining = current.filter((item) => item.url !== url);
+      track('file_removed', { tool_id: tool.id, remaining_files: remaining.length });
+      return remaining;
+    });
   };
 
   const operation = useMemo(() => {
@@ -156,7 +162,14 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
       if (next.status === 'complete') {
         await loadPreviews(next, secret);
         setBusy(false);
-        track('processing_complete', { tool_id: tool.id, processing_result: 'success' });
+        const outFiles = next.files.filter((file) => file.role === 'output');
+        const totalOutBytes = outFiles.reduce((acc, f) => acc + f.bytes, 0);
+        track('processing_complete', {
+          tool_id: tool.id,
+          processing_result: 'success',
+          output_count: outFiles.length,
+          output_bytes: totalOutBytes,
+        });
         return;
       }
       if (next.status === 'error') {
@@ -165,6 +178,11 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
         track('processing_complete', {
           tool_id: tool.id,
           processing_result: next.error?.code ?? 'error',
+        });
+        track('error_encountered', {
+          tool_id: tool.id,
+          error_code: next.error?.code,
+          error_message: next.error?.message ?? 'Processing failed.',
         });
         return;
       }
@@ -207,7 +225,12 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
     body.append('toolId', tool.id);
     body.append('operation', JSON.stringify(operation));
     files.forEach(({ file }) => body.append('files', file, file.name));
-    track('processing_start', { tool_id: tool.id, output_format: operation.format ?? 'original' });
+    track('processing_start', {
+      tool_id: tool.id,
+      file_count: files.length,
+      output_format: operation.format ?? 'original',
+      mode: operation.mode ?? 'default',
+    });
     try {
       const response = await fetch('/api/jobs', { method: 'POST', body });
       const result = await response.json();
@@ -216,7 +239,9 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
       await poll(result.id, result.token);
     } catch (problem) {
       setBusy(false);
-      setError(problem instanceof Error ? problem.message : 'The network interrupted this job.');
+      const msg = problem instanceof Error ? problem.message : 'The network interrupted this job.';
+      setError(msg);
+      track('error_encountered', { tool_id: tool.id, error_message: msg });
     }
   };
 
@@ -227,6 +252,10 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
     });
     if (!response.ok) {
       setError('This result is no longer available.');
+      track('error_encountered', {
+        tool_id: tool.id,
+        error_message: 'Result no longer available',
+      });
       return;
     }
     const url = URL.createObjectURL(await response.blob());
@@ -235,7 +264,12 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
     anchor.download = file.downloadName;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    track('download_result', { tool_id: tool.id, output_format: file.format });
+    track('download_result', {
+      tool_id: tool.id,
+      output_format: file.format,
+      bytes: file.bytes,
+      savings_percent: file.savingsPercent,
+    });
   };
 
   const downloadAll = async (): Promise<void> => {
@@ -245,6 +279,7 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
     });
     if (!response.ok) {
       setError('The ZIP could not be generated. Individual downloads still work.');
+      track('error_encountered', { tool_id: tool.id, error_message: 'ZIP generation failed' });
       return;
     }
     const url = URL.createObjectURL(await response.blob());
@@ -253,7 +288,7 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
     anchor.download = 'compressimage-results.zip';
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    track('download_batch', { tool_id: tool.id });
+    track('download_batch', { tool_id: tool.id, file_count: outputs.length });
   };
 
   const deleteNow = async (): Promise<void> => {
@@ -283,10 +318,12 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
     });
     if (!response.ok) {
       setBusy(false);
-      setError((await response.json()).error?.message ?? 'Could not continue this job.');
+      const msg = (await response.json()).error?.message ?? 'Could not continue this job.';
+      setError(msg);
+      track('error_encountered', { tool_id: tool.id, error_message: msg });
       return;
     }
-    track('continue_with_tool', { tool_id: tool.id });
+    track('continue_with_tool', { tool_id: tool.id, next_operation: nextOperation.kind });
     await poll(job.id, token);
   };
 
@@ -622,7 +659,10 @@ function Settings({
               <button
                 type="button"
                 class={settings.mode === mode ? 'active' : ''}
-                onClick={() => update('mode', mode)}
+                onClick={() => {
+                  update('mode', mode);
+                  track('mode_changed', { tool_id: tool.id, mode });
+                }}
               >
                 {mode === 'exact' ? 'Exact Size' : mode.charAt(0).toUpperCase() + mode.slice(1)}
               </button>
@@ -820,9 +860,10 @@ function Settings({
           ].map(([label, ratio]) => (
             <button
               type="button"
-              onClick={() =>
-                update('height', Math.max(1, Math.round(Number(settings.width) / Number(ratio))))
-              }
+              onClick={() => {
+                update('height', Math.max(1, Math.round(Number(settings.width) / Number(ratio))));
+                track('crop_preset_selected', { tool_id: tool.id, preset: label });
+              }}
             >
               {label}
             </button>
@@ -1146,7 +1187,11 @@ function FormatField({
       <select
         id="output-format"
         value={value ?? 'original'}
-        onChange={(event) => update('format', event.currentTarget.value)}
+        onChange={(event) => {
+          const next = event.currentTarget.value;
+          update('format', next);
+          track('format_changed', { format: next });
+        }}
       >
         {formats
           .filter((format) => !noOriginal || format !== 'original')

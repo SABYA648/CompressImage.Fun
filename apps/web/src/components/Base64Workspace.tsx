@@ -103,13 +103,16 @@ export default function Base64Workspace({ tool }: { tool: ToolDefinition }) {
     if (!selected) return;
     setError('');
     if (selected.size > MAX_FILE_BYTES) {
-      setError(
-        'This image is larger than the 25 MB browser safety limit. Use a file workflow instead.',
-      );
+      const msg =
+        'This image is larger than the 25 MB browser safety limit. Use a file workflow instead.';
+      setError(msg);
+      track('error_encountered', { tool_id: tool.id, error_message: msg });
       return;
     }
     if (!selected.type.startsWith('image/')) {
-      setError('Choose an image file.');
+      const msg = 'Choose an image file.';
+      setError(msg);
+      track('error_encountered', { tool_id: tool.id, error_message: msg });
       return;
     }
     const reader = new FileReader();
@@ -118,11 +121,19 @@ export default function Base64Workspace({ tool }: { tool: ToolDefinition }) {
       setDataUri(String(reader.result));
       track('base64_encode', {
         tool_id: tool.id,
+        input_format: selected.type,
+        input_size_bytes: selected.size,
         input_size_bucket:
           selected.size < 1024 * 100 ? 'small' : selected.size < 1024 * 1024 ? 'medium' : 'large',
       });
     };
-    reader.onerror = () => setError('The browser could not read this image.');
+    reader.onerror = () => {
+      setError('The browser could not read this image.');
+      track('error_encountered', {
+        tool_id: tool.id,
+        error_message: 'The browser could not read this image.',
+      });
+    };
     reader.readAsDataURL(selected);
   };
 
@@ -155,21 +166,33 @@ export default function Base64Workspace({ tool }: { tool: ToolDefinition }) {
         image.onerror = () => {
           URL.revokeObjectURL(url);
           setError('The Base64 decoded, but the image is damaged or unsupported.');
+          track('error_encountered', {
+            tool_id: tool.id,
+            error_message: 'Image damaged or unsupported',
+          });
         };
         image.src = url;
       }
-      track('base64_decode', { tool_id: tool.id, input_format: mime });
+      track('base64_decode', {
+        tool_id: tool.id,
+        input_format: mime,
+        decoded_bytes: bytes.length,
+      });
     } catch (problem) {
       setDecoded(undefined);
-      setError(problem instanceof Error ? problem.message : 'Could not decode this value.');
+      const msg = problem instanceof Error ? problem.message : 'Could not decode this value.';
+      setError(msg);
+      track('error_encountered', { tool_id: tool.id, error_message: msg });
     }
   };
 
   const copy = async (): Promise<void> => {
+    track('base64_copy', { tool_id: tool.id, format: wrapper, char_count: output.length });
     await navigator.clipboard.writeText(output);
   };
 
   const downloadText = (): void => {
+    track('base64_download_text', { tool_id: tool.id, format: wrapper });
     const url = URL.createObjectURL(new Blob([output], { type: 'text/plain;charset=utf-8' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -180,6 +203,11 @@ export default function Base64Workspace({ tool }: { tool: ToolDefinition }) {
 
   const downloadImage = (): void => {
     if (!decoded) return;
+    track('base64_download_image', {
+      tool_id: tool.id,
+      mime: decoded.mime,
+      bytes: decoded.bytes,
+    });
     const extension = decoded.mime.split('/')[1]?.replace('jpeg', 'jpg') ?? 'bin';
     const anchor = document.createElement('a');
     anchor.href = decoded.url;
@@ -256,7 +284,11 @@ export default function Base64Workspace({ tool }: { tool: ToolDefinition }) {
                     <select
                       id="wrapper"
                       value={wrapper}
-                      onChange={(event) => setWrapper(event.currentTarget.value)}
+                      onChange={(event) => {
+                        const next = event.currentTarget.value;
+                        setWrapper(next);
+                        track('base64_format_changed', { tool_id: tool.id, format: next });
+                      }}
                     >
                       <option value="raw">Raw Base64</option>
                       <option value="data-uri">Data URI</option>

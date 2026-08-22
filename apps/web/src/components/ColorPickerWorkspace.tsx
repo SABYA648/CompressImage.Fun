@@ -68,7 +68,10 @@ export default function ColorPickerWorkspace({ tool }: { tool: ToolDefinition })
       setCursor({ x: Math.floor(image.naturalWidth / 2), y: Math.floor(image.naturalHeight / 2) });
       extractPalette(target);
     };
-    image.onerror = () => setError('This browser could not decode the image.');
+    image.onerror = () => {
+      setError('This browser could not decode the image.');
+      track('error_encountered', { tool_id: tool.id, error_message: 'Image decode failed' });
+    };
     image.src = nextUrl;
     track('file_selected', { tool_id: tool.id, file_count_bucket: '1' });
   };
@@ -127,10 +130,17 @@ export default function ColorPickerWorkspace({ tool }: { tool: ToolDefinition })
         }),
     );
   };
-  const lock = (color = hover): void =>
+  const lock = (color = hover): void => {
+    track('color_locked', {
+      tool_id: tool.id,
+      hex: hex(color),
+      rgb: `${color.r},${color.g},${color.b}`,
+      hsl: hsl(color),
+    });
     setLocked((current) =>
       [color, ...current.filter((item) => hex(item) !== hex(color))].slice(0, 8),
     );
+  };
   const keyboard = (event: KeyboardEvent): void => {
     const delta = event.shiftKey ? 10 : 1;
     const target = canvas.current;
@@ -152,6 +162,7 @@ export default function ColorPickerWorkspace({ tool }: { tool: ToolDefinition })
     setHover(colorAt(x, y));
   };
   const copy = (value: string): void => {
+    track('color_copied', { tool_id: tool.id, value });
     void navigator.clipboard.writeText(value);
   };
 
@@ -198,7 +209,11 @@ export default function ColorPickerWorkspace({ tool }: { tool: ToolDefinition })
                   max="8"
                   step="0.5"
                   value={zoom}
-                  onInput={(event) => setZoom(Number(event.currentTarget.value))}
+                  onInput={(event) => {
+                    const nextZoom = Number(event.currentTarget.value);
+                    setZoom(nextZoom);
+                    track('color_zoom_changed', { tool_id: tool.id, zoom: nextZoom });
+                  }}
                 />
                 <button
                   class="secondary-button"

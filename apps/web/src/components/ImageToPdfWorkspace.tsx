@@ -99,6 +99,11 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
   const move = (index: number, direction: -1 | 1): void => {
     const target = index + direction;
     if (target < 0 || target >= images.length) return;
+    track('pdf_reorder', {
+      tool_id: tool.id,
+      direction: direction > 0 ? 'down' : 'up',
+      total_images: images.length,
+    });
     setImages((current) => {
       const next = [...current];
       const [item] = next.splice(index, 1);
@@ -109,6 +114,11 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
 
   const dropAt = (targetId: string): void => {
     if (!dragged || dragged === targetId) return;
+    track('pdf_reorder', {
+      tool_id: tool.id,
+      direction: 'drag_drop',
+      total_images: images.length,
+    });
     setImages((current) => {
       const next = [...current];
       const from = next.findIndex((image) => image.id === dragged);
@@ -123,7 +133,14 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
   const build = async (): Promise<void> => {
     setBusy(true);
     setError('');
-    track('processing_start', { tool_id: tool.id, output_format: 'pdf' });
+    track('processing_start', {
+      tool_id: tool.id,
+      output_format: 'pdf',
+      page_count: images.length,
+      paper_size: paper,
+      orientation,
+      quality,
+    });
     try {
       const pdf = await PDFDocument.create();
       for (const item of images) {
@@ -171,11 +188,23 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
       anchor.download = 'images.pdf';
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      track('processing_complete', { tool_id: tool.id, processing_result: 'success' });
-      track('download_result', { tool_id: tool.id, output_format: 'pdf' });
+      track('processing_complete', {
+        tool_id: tool.id,
+        processing_result: 'success',
+        page_count: images.length,
+        output_bytes: bytes.length,
+      });
+      track('download_result', {
+        tool_id: tool.id,
+        output_format: 'pdf',
+        page_count: images.length,
+        output_bytes: bytes.length,
+      });
     } catch (problem) {
-      setError(problem instanceof Error ? problem.message : 'Could not build the PDF.');
+      const msg = problem instanceof Error ? problem.message : 'Could not build the PDF.';
+      setError(msg);
       track('processing_complete', { tool_id: tool.id, processing_result: 'error' });
+      track('error_encountered', { tool_id: tool.id, error_message: msg });
     } finally {
       setBusy(false);
     }
@@ -274,6 +303,10 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
                           onClick={() => {
                             URL.revokeObjectURL(item.url);
                             setImages((current) => current.filter((image) => image.id !== item.id));
+                            track('pdf_image_removed', {
+                              tool_id: tool.id,
+                              remaining_images: images.length - 1,
+                            });
                           }}
                         >
                           ×
@@ -290,7 +323,15 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
                   <select
                     id="paper"
                     value={paper}
-                    onChange={(event) => setPaper(event.currentTarget.value as typeof paper)}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value as typeof paper;
+                      setPaper(next);
+                      track('pdf_settings_changed', {
+                        tool_id: tool.id,
+                        setting: 'paper',
+                        value: next,
+                      });
+                    }}
                   >
                     <option>A4</option>
                     <option>Letter</option>
@@ -303,9 +344,15 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
                     <select
                       id="orientation"
                       value={orientation}
-                      onChange={(event) =>
-                        setOrientation(event.currentTarget.value as typeof orientation)
-                      }
+                      onChange={(event) => {
+                        const next = event.currentTarget.value as typeof orientation;
+                        setOrientation(next);
+                        track('pdf_settings_changed', {
+                          tool_id: tool.id,
+                          setting: 'orientation',
+                          value: next,
+                        });
+                      }}
                     >
                       <option>portrait</option>
                       <option>landscape</option>
@@ -328,7 +375,15 @@ export default function ImageToPdfWorkspace({ tool }: { tool: ToolDefinition }) 
                   <select
                     id="pdf-fit"
                     value={fit}
-                    onChange={(event) => setFit(event.currentTarget.value as typeof fit)}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value as typeof fit;
+                      setFit(next);
+                      track('pdf_settings_changed', {
+                        tool_id: tool.id,
+                        setting: 'fit',
+                        value: next,
+                      });
+                    }}
                   >
                     <option value="contain">Fit whole image</option>
                     <option value="cover">Fill page and crop edges</option>

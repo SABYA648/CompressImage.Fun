@@ -12,7 +12,13 @@ const related = ids.map((id) => toolById.get(id)).filter(Boolean);
       related.map(
         (tool) =>
           tool && (
-            <a class="related-link" href={toolPath(tool)}>
+            <a
+              class="related-link"
+              href={toolPath(tool)}
+              data-umami-event="Related Tool Click"
+              data-umami-event-tool={tool.id}
+              data-umami-event-category={tool.category}
+            >
               <>
                 <span>{tool.category}</span>
                 <strong>{tool.h1}</strong>
