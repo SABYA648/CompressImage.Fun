@@ -85,19 +85,31 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
   const [busy, setBusy] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [cropLockedRatio, setCropLockedRatio] = useState<number | null>(null);
 
   useEffect(() => {
     track('tool_open', { tool_id: tool.id });
+  }, [files.length]);
+
+  useEffect(() => {
     if (
       tool.kind === 'crop' &&
       files[0]?.width &&
       files[0]?.height &&
+      settings.left === 0 &&
+      settings.top === 0 &&
       settings.width === 100 &&
       settings.height === 100
     ) {
-      setSettings((current) => ({ ...current, width: files[0]?.width, height: files[0]?.height }));
+      setSettings((current) => ({
+        ...current,
+        left: 0,
+        top: 0,
+        width: files[0]?.width,
+        height: files[0]?.height,
+      }));
     }
-  }, [files.length]);
+  }, [tool.kind, files[0]?.width, files[0]?.height]);
 
   useEffect(() => {
     const paste = (event: ClipboardEvent): void => {
@@ -473,29 +485,43 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
                   multiple={tool.multiple}
                   onChange={(event) => addFiles(Array.from(event.currentTarget.files ?? []))}
                 />
-                <ul class="file-list">
-                  {files.map((item) => (
-                    <li class="file-card" key={item.url}>
-                      <img class="file-thumb" src={item.url} alt="" />
-                      <div>
-                        <strong title={item.file.name}>{item.file.name}</strong>
-                        <small>
-                          {item.file.type?.replace('image/', '').toUpperCase() || 'IMAGE'} ·{' '}
-                          {bytesLabel(item.file.size)}
-                          {item.width ? ` · ${item.width} × ${item.height}` : ''}
-                        </small>
-                      </div>
-                      <button
-                        class="icon-button"
-                        type="button"
-                        aria-label={`Remove ${item.file.name}`}
-                        onClick={() => removeFile(item.url)}
-                      >
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                {tool.kind === 'crop' && files[0]?.width && files[0]?.height ? (
+                  <CropCanvas
+                    file={files[0]}
+                    box={{
+                      left: settings.left ?? 0,
+                      top: settings.top ?? 0,
+                      width: settings.width ?? files[0].width,
+                      height: settings.height ?? files[0].height,
+                    }}
+                    lockedRatio={cropLockedRatio}
+                    onChange={(next) => setSettings((current) => ({ ...current, ...next }))}
+                  />
+                ) : (
+                  <ul class="file-list">
+                    {files.map((item) => (
+                      <li class="file-card" key={item.url}>
+                        <img class="file-thumb" src={item.url} alt="" />
+                        <div>
+                          <strong title={item.file.name}>{item.file.name}</strong>
+                          <small>
+                            {item.file.type?.replace('image/', '').toUpperCase() || 'IMAGE'} ·{' '}
+                            {bytesLabel(item.file.size)}
+                            {item.width ? ` · ${item.width} × ${item.height}` : ''}
+                          </small>
+                        </div>
+                        <button
+                          class="icon-button"
+                          type="button"
+                          aria-label={`Remove ${item.file.name}`}
+                          onClick={() => removeFile(item.url)}
+                        >
+                          ×
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
               <aside class="settings-panel" aria-labelledby="settings-title">
                 <h2 id="settings-title">Settings</h2>
@@ -507,6 +533,10 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
                   setTargetValue={setTargetValue}
                   targetUnit={targetUnit}
                   setTargetUnit={setTargetUnit}
+                  cropLockedRatio={cropLockedRatio}
+                  setCropLockedRatio={setCropLockedRatio}
+                  naturalWidth={files[0]?.width}
+                  naturalHeight={files[0]?.height}
                   sourceRatio={
                     files[0]?.width && files[0]?.height
                       ? files[0].width / files[0].height
@@ -704,6 +734,10 @@ function Settings({
   setTargetValue,
   targetUnit,
   setTargetUnit,
+  cropLockedRatio,
+  setCropLockedRatio,
+  naturalWidth,
+  naturalHeight,
   sourceRatio,
 }: any) {
   const update = (key: string, value: any) =>
@@ -892,6 +926,7 @@ function Settings({
   if (tool.kind === 'crop')
     return (
       <>
+        <p class="crop-hint">Drag the box on the preview, or set exact pixels below.</p>
         <div class="field-row">
           <NumberField
             label="Left"
@@ -911,22 +946,60 @@ function Settings({
           />
         </div>
         <div class="target-presets">
-          {[
-            ['1:1', 1],
-            ['4:3', 4 / 3],
-            ['3:2', 1.5],
-            ['16:9', 16 / 9],
-          ].map(([label, ratio]) => (
+          {(
+            [
+              ['Free', null],
+              ['1:1', 1],
+              ['4:3', 4 / 3],
+              ['3:2', 1.5],
+              ['16:9', 16 / 9],
+            ] as [string, number | null][]
+          ).map(([label, ratio]) => (
             <button
               type="button"
+              class={cropLockedRatio === ratio ? 'active' : ''}
               onClick={() => {
-                update('height', Math.max(1, Math.round(Number(settings.width) / Number(ratio))));
+                setCropLockedRatio(ratio);
+                if (ratio !== null && naturalWidth && naturalHeight) {
+                  let width = naturalWidth;
+                  let height = width / ratio;
+                  if (height > naturalHeight) {
+                    height = naturalHeight;
+                    width = height * ratio;
+                  }
+                  width = Math.round(width);
+                  height = Math.round(height);
+                  setSettings((current: Record<string, any>) => ({
+                    ...current,
+                    left: Math.round((naturalWidth - width) / 2),
+                    top: Math.round((naturalHeight - height) / 2),
+                    width,
+                    height,
+                  }));
+                }
                 track('crop_preset_selected', { tool_id: tool.id, preset: label });
               }}
             >
               {label}
             </button>
           ))}
+          {naturalWidth && naturalHeight && (
+            <button
+              type="button"
+              onClick={() => {
+                setCropLockedRatio(null);
+                setSettings((current: Record<string, any>) => ({
+                  ...current,
+                  left: 0,
+                  top: 0,
+                  width: naturalWidth,
+                  height: naturalHeight,
+                }));
+              }}
+            >
+              Reset
+            </button>
+          )}
         </div>
         <FormatField value={settings.format} update={update} />
       </>
@@ -1204,6 +1277,216 @@ function Settings({
       </>
     );
   return null;
+}
+
+interface CropRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+const CROP_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const;
+type CropHandle = (typeof CROP_HANDLES)[number];
+const CROP_CORNER_ANCHOR: Record<string, { fixX: boolean; fixY: boolean }> = {
+  se: { fixX: false, fixY: false },
+  nw: { fixX: true, fixY: true },
+  ne: { fixX: true, fixY: false },
+  sw: { fixX: false, fixY: true },
+};
+
+function clampRect(rect: CropRect, naturalWidth: number, naturalHeight: number): CropRect {
+  const width = Math.min(Math.max(1, Math.round(rect.width)), naturalWidth);
+  const height = Math.min(Math.max(1, Math.round(rect.height)), naturalHeight);
+  const left = Math.min(Math.max(0, Math.round(rect.left)), naturalWidth - width);
+  const top = Math.min(Math.max(0, Math.round(rect.top)), naturalHeight - height);
+  return { left, top, width, height };
+}
+
+function resizeCropRect(
+  handle: CropHandle,
+  dx: number,
+  dy: number,
+  box: CropRect,
+  ratio: number | null,
+  naturalWidth: number,
+  naturalHeight: number,
+): CropRect {
+  const minSize = Math.max(4, Math.round(Math.min(naturalWidth, naturalHeight) * 0.02));
+  const right = box.left + box.width;
+  const bottom = box.top + box.height;
+  if (ratio && CROP_CORNER_ANCHOR[handle]) {
+    const grows = handle === 'se' || handle === 'ne' ? dx : -dx;
+    let width = Math.min(Math.max(minSize, box.width + grows), naturalWidth);
+    let height = width / ratio;
+    if (height > naturalHeight) {
+      height = naturalHeight;
+      width = height * ratio;
+    } else if (height < minSize) {
+      height = minSize;
+      width = height * ratio;
+    }
+    const anchor = CROP_CORNER_ANCHOR[handle];
+    const left = anchor.fixX ? right - width : box.left;
+    const top = anchor.fixY ? bottom - height : box.top;
+    return { left, top, width, height };
+  }
+  let { left, top, width, height } = box;
+  if (handle.includes('e')) width += dx;
+  if (handle.includes('s')) height += dy;
+  if (handle.includes('w')) {
+    width -= dx;
+    left += dx;
+  }
+  if (handle.includes('n')) {
+    height -= dy;
+    top += dy;
+  }
+  return { left, top, width: Math.max(minSize, width), height: Math.max(minSize, height) };
+}
+
+function CropCanvas({
+  file,
+  box,
+  lockedRatio,
+  onChange,
+}: {
+  file: { url: string; width?: number; height?: number };
+  box: CropRect;
+  lockedRatio: number | null;
+  onChange: (next: CropRect) => void;
+}) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ mode: 'move' | 'resize'; handle: CropHandle | undefined } | null>(null);
+  const naturalWidth = file.width ?? 1;
+  const naturalHeight = file.height ?? 1;
+
+  const beginDrag = (mode: 'move' | 'resize', handle?: CropHandle) => (event: PointerEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    dragRef.current = { mode, handle };
+  };
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (!dragRef.current || !frameRef.current) return;
+    const rect = frameRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const dx = (event.movementX / rect.width) * naturalWidth;
+    const dy = (event.movementY / rect.height) * naturalHeight;
+    const next =
+      dragRef.current.mode === 'move'
+        ? {
+            ...box,
+            left: box.left + dx,
+            top: box.top + dy,
+          }
+        : resizeCropRect(
+            dragRef.current.handle!,
+            dx,
+            dy,
+            box,
+            lockedRatio,
+            naturalWidth,
+            naturalHeight,
+          );
+    onChange(clampRect(next, naturalWidth, naturalHeight));
+  };
+
+  const endDrag = () => {
+    dragRef.current = null;
+  };
+
+  const nudge = (event: KeyboardEvent) => {
+    const step = event.shiftKey ? 10 : 1;
+    const deltas: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    };
+    const delta = deltas[event.key];
+    if (!delta) return;
+    event.preventDefault();
+    onChange(
+      clampRect(
+        { ...box, left: box.left + delta[0], top: box.top + delta[1] },
+        naturalWidth,
+        naturalHeight,
+      ),
+    );
+  };
+
+  const visibleHandles = lockedRatio
+    ? CROP_HANDLES.filter((handle) => CROP_CORNER_ANCHOR[handle])
+    : CROP_HANDLES;
+
+  const leftPct = (box.left / naturalWidth) * 100;
+  const topPct = (box.top / naturalHeight) * 100;
+  const widthPct = (box.width / naturalWidth) * 100;
+  const heightPct = (box.height / naturalHeight) * 100;
+
+  return (
+    <div
+      class="crop-stage"
+      style={{ aspectRatio: `${naturalWidth} / ${naturalHeight}` }}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+    >
+      <div class="crop-frame" ref={frameRef}>
+        <img class="crop-stage-image" src={file.url} alt="" draggable={false} />
+        <div class="crop-shade" style={{ left: 0, top: 0, width: '100%', height: `${topPct}%` }} />
+        <div
+          class="crop-shade"
+          style={{
+            left: 0,
+            top: `${topPct + heightPct}%`,
+            width: '100%',
+            height: `${100 - topPct - heightPct}%`,
+          }}
+        />
+        <div
+          class="crop-shade"
+          style={{ left: 0, top: `${topPct}%`, width: `${leftPct}%`, height: `${heightPct}%` }}
+        />
+        <div
+          class="crop-shade"
+          style={{
+            left: `${leftPct + widthPct}%`,
+            top: `${topPct}%`,
+            width: `${100 - leftPct - widthPct}%`,
+            height: `${heightPct}%`,
+          }}
+        />
+      </div>
+      <div
+        class="crop-box"
+        role="slider"
+        tabIndex={0}
+        aria-label="Crop area"
+        aria-valuetext={`${box.width} by ${box.height} pixels`}
+        style={{
+          left: `calc(12px + (100% - 24px) * ${leftPct / 100})`,
+          top: `calc(12px + (100% - 24px) * ${topPct / 100})`,
+          width: `calc((100% - 24px) * ${widthPct / 100})`,
+          height: `calc((100% - 24px) * ${heightPct / 100})`,
+        }}
+        onPointerDown={beginDrag('move')}
+        onKeyDown={nudge}
+      >
+        {visibleHandles.map((handle) => (
+          <span
+            class={`crop-handle crop-handle-${handle}`}
+            key={handle}
+            onPointerDown={beginDrag('resize', handle)}
+          />
+        ))}
+        <span class="crop-dim-badge">
+          {box.width} × {box.height}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function NumberField({
