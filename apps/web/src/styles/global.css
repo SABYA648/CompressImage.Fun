@@ -662,6 +662,90 @@ button {
   align-items: center;
   gap: 10px;
 }
+.target-copy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.percentage-summary {
+  display: grid;
+  gap: 3px;
+  padding: 14px;
+  margin: 0 0 14px;
+  border: 1px solid #bfe5d4;
+  border-radius: 12px;
+  background: #effbf5;
+  color: #075b40;
+  font-size: 0.88rem;
+}
+.word-cloud-workspace {
+  padding: 20px;
+}
+.word-cloud-controls {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+  gap: 20px;
+}
+.word-cloud-controls textarea,
+.word-cloud-controls input,
+.word-cloud-controls select {
+  width: 100%;
+  border: 1px solid #aaa49a;
+  border-radius: 10px;
+  padding: 9px;
+  background: white;
+}
+.word-cloud-controls textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+.word-cloud-controls label {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 750;
+  margin: 10px 0;
+}
+.word-cloud-controls .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.word-cloud-controls .check input {
+  width: 18px;
+}
+.word-cloud-preview {
+  min-width: 0;
+}
+.word-cloud-preview canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: repeating-conic-gradient(#eef0f8 0% 25%, white 0% 50%) 50% / 24px 24px;
+}
+.word-cloud-preview table {
+  width: 100%;
+  margin-top: 18px;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.word-cloud-preview th,
+.word-cloud-preview td {
+  padding: 7px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+.word-cloud-preview td input[type='number'] {
+  max-width: 100px;
+}
+.word-cloud-preview td input[type='checkbox'] {
+  width: 18px;
+}
+.error-inline {
+  color: var(--danger);
+  font-size: 0.8rem;
+}
 .process-button {
   width: 100%;
   margin-top: 8px;

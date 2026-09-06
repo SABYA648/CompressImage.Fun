@@ -6,10 +6,11 @@ const quality = z.number().int().min(1).max(100).optional();
 export const operationSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('compress'),
-    mode: z.enum(['smart', 'exact', 'quality', 'lossless']),
+    mode: z.enum(['smart', 'exact', 'quality', 'lossless', 'percent']),
     format: output.default('original'),
     quality,
     targetBytes: z.number().int().min(1024).max(104_857_600).optional(),
+    reductionPercent: z.number().int().min(5).max(90).optional(),
     minQuality: z.number().int().min(1).max(95).optional(),
     preserveMetadata: z.boolean().optional(),
     aggressive: z.boolean().optional(),
@@ -44,9 +45,15 @@ export const operationSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('convert'),
-    format: z.enum(['jpeg', 'png', 'webp', 'avif']),
+    format: z.enum(['jpeg', 'png', 'webp', 'avif', 'gif', 'tiff', 'svg']),
     quality,
     background: z.string().max(32).optional(),
+    animationMode: z.enum(['preserve', 'first-frame', 'extract-frames']).optional(),
+    svgEmbeddedFormat: z.enum(['auto', 'png', 'jpeg']).optional(),
+    tiffCompression: z.enum(['lzw', 'deflate', 'jpeg']).optional(),
+    gifColours: z.number().int().min(2).max(256).optional(),
+    gifDither: z.number().min(0).max(1).optional(),
+    svgScale: z.union([z.literal(1), z.literal(2), z.literal(4)]).optional(),
   }),
   z.object({
     kind: z.literal('metadata'),

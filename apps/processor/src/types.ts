@@ -1,13 +1,32 @@
 export type SupportedFormat = 'jpeg' | 'png' | 'webp' | 'avif' | 'gif' | 'svg' | 'heif' | 'tiff';
-export type OutputFormat = 'original' | 'jpeg' | 'png' | 'webp' | 'avif';
+export type CoreOutputFormat = 'jpeg' | 'png' | 'webp' | 'avif';
+export type TransformOutputFormat = 'original' | CoreOutputFormat;
+export type ConvertOutputFormat = CoreOutputFormat | 'gif' | 'tiff' | 'svg';
+
+// Kept as an alias for the non-converter transforms while downstream callers migrate.
+export type OutputFormat = TransformOutputFormat;
+
+export type ConvertOperation = {
+  kind: 'convert';
+  format: ConvertOutputFormat;
+  quality?: number;
+  background?: string;
+  animationMode?: 'preserve' | 'first-frame' | 'extract-frames';
+  svgEmbeddedFormat?: 'auto' | 'png' | 'jpeg';
+  tiffCompression?: 'lzw' | 'deflate' | 'jpeg';
+  gifColours?: number;
+  gifDither?: number;
+  svgScale?: 1 | 2 | 4;
+};
 
 export type Operation =
   | {
       kind: 'compress';
-      mode: 'smart' | 'exact' | 'quality' | 'lossless';
-      format: OutputFormat;
+      mode: 'smart' | 'exact' | 'quality' | 'lossless' | 'percent';
+      format: TransformOutputFormat;
       quality?: number;
       targetBytes?: number;
+      reductionPercent?: number;
       minQuality?: number;
       preserveMetadata?: boolean;
       aggressive?: boolean;
@@ -35,12 +54,7 @@ export type Operation =
       quality?: number;
     }
   | { kind: 'rotate'; degrees: 90 | 180 | 270; format: OutputFormat; quality?: number }
-  | {
-      kind: 'convert';
-      format: Exclude<OutputFormat, 'original'>;
-      quality?: number;
-      background?: string;
-    }
+  | ConvertOperation
   | { kind: 'metadata'; action: 'inspect' | 'remove'; format?: OutputFormat }
   | {
       kind: 'prepare';
@@ -87,6 +101,10 @@ export interface SafeMetadata {
   hasAlpha?: boolean;
   isProgressive?: boolean;
   pages?: number;
+  pageHeight?: number;
+  delay?: number[];
+  loop?: number;
+  animated?: boolean;
   orientation?: number;
   exif?: Record<string, string | number | boolean>;
 }
@@ -108,6 +126,9 @@ export interface JobFile {
   savingsPercent?: number;
   iterations?: number;
   note?: string;
+  frameIndex?: number;
+  frameCount?: number;
+  outputGroup?: string;
 }
 
 export interface JobRecord {

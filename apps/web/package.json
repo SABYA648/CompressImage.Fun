@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@astrojs/preact": "^6.0.2",
+    "@types/d3-cloud": "^1.2.9",
     "astro": "^7.2.0",
+    "d3-cloud": "^1.2.9",
     "pdf-lib": "^1.17.1",
     "preact": "^10.0.0"
   },

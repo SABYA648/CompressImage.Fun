@@ -10,6 +10,8 @@ const routes = [
   '/compress-image-to-50kb',
   '/resize-image',
   '/image-to-base64',
+  '/word-cloud-generator',
+  '/convert-image',
   '/guides/how-to-compress-image-to-exact-file-size',
   '/tools',
 ];

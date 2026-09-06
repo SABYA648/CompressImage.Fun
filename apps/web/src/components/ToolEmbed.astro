@@ -4,6 +4,7 @@ import Base64Workspace from './Base64Workspace';
 import ColorPickerWorkspace from './ColorPickerWorkspace';
 import ImageToPdfWorkspace from './ImageToPdfWorkspace';
 import ToolWorkspace from './ToolWorkspace';
+import WordCloudWorkspace from './WordCloudWorkspace';
 
 const { tool, eager = false } = Astro.props as { tool: ToolDefinition; eager?: boolean };
 const browserOnly = ['base64-encode', 'base64-decode', 'base64-viewer'].includes(tool.kind);
@@ -27,6 +28,12 @@ const browserOnly = ['base64-encode', 'base64-decode', 'base64-viewer'].includes
       <Base64Workspace tool={tool} client:load />
     ) : (
       <Base64Workspace tool={tool} client:visible />
+    )
+  ) : tool.kind === 'word-cloud' ? (
+    eager ? (
+      <WordCloudWorkspace client:load />
+    ) : (
+      <WordCloudWorkspace client:visible />
     )
   ) : eager ? (
     <ToolWorkspace tool={tool} client:load />

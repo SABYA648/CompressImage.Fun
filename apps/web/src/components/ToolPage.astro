@@ -7,10 +7,15 @@ import ImageToPdfWorkspace from './ImageToPdfWorkspace';
 import RelatedTools from './RelatedTools.astro';
 import RelatedGuides from './RelatedGuides.astro';
 import ToolWorkspace from './ToolWorkspace';
+import WordCloudWorkspace from './WordCloudWorkspace';
 
 const { tool, home = false } = Astro.props as { tool: ToolDefinition; home?: boolean };
 const browserOnly = ['base64-encode', 'base64-decode', 'base64-viewer'].includes(tool.kind);
-const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'color-picker';
+const localTool =
+  browserOnly ||
+  tool.kind === 'image-pdf' ||
+  tool.kind === 'color-picker' ||
+  tool.kind === 'word-cloud';
 ---
 
 {!home && <Breadcrumbs items={[{ label: 'Tools', href: '/tools' }, { label: tool.h1 }]} />}
@@ -55,6 +60,8 @@ const localTool = browserOnly || tool.kind === 'image-pdf' || tool.kind === 'col
     <ColorPickerWorkspace tool={tool} client:load />
   ) : browserOnly ? (
     <Base64Workspace tool={tool} client:load />
+  ) : tool.kind === 'word-cloud' ? (
+    <WordCloudWorkspace client:load />
   ) : (
     <ToolWorkspace tool={tool} client:load />
   )

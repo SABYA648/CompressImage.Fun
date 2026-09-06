@@ -4,21 +4,42 @@ import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
 import { promisify } from 'node:util';
 import exifr from 'exifr';
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 import { ZipFile } from 'yazl';
 import { config } from './config.js';
 import {
   encode,
+  encodeConversion,
   formatInfo,
   inputSharp,
   resolveOutputFormat,
+  type ConverterRasterFormat,
   type EncodableFormat,
 } from './codecs.js';
 import { AppError, friendlyError } from './errors.js';
 import { optimizeExactSize } from './exact-size.js';
 import { JobStore } from './job-store.js';
-import { randomId } from './security.js';
-import type { JobFile, JobRecord, Operation, SafeMetadata, SupportedFormat } from './types.js';
+import { allocatePercentageTargets } from './percentage-target.js';
+import { assertSafeSvg, randomId } from './security.js';
+import type {
+  ConvertOperation,
+  JobFile,
+  JobRecord,
+  Operation,
+  SafeMetadata,
+  SupportedFormat,
+} from './types.js';
+
+interface RenderedOutput {
+  buffer: Buffer;
+  format: ConverterRasterFormat | 'svg';
+  iterations?: number;
+  note?: string;
+  frameIndex?: number;
+  frameCount?: number;
+  outputGroup?: string;
+  nameKind?: 'frame' | 'page';
+}
 
 const safeExifKeys = [
   'Make',
@@ -165,22 +186,45 @@ export class ImageEngine {
       ...(metadata.hasAlpha !== undefined ? { hasAlpha: metadata.hasAlpha } : {}),
       ...(metadata.isProgressive !== undefined ? { isProgressive: metadata.isProgressive } : {}),
       ...(metadata.pages ? { pages: metadata.pages } : {}),
+      ...(metadata.pageHeight ? { pageHeight: metadata.pageHeight } : {}),
+      ...(metadata.delay ? { delay: metadata.delay } : {}),
+      ...(metadata.loop !== undefined ? { loop: metadata.loop } : {}),
+      ...((metadata.pages ?? 1) > 1 && (metadata.format === 'gif' || metadata.format === 'webp')
+        ? { animated: true }
+        : {}),
       ...(metadata.orientation ? { orientation: metadata.orientation } : {}),
       ...(exif ? { exif } : {}),
     };
   }
 
   async processJob(jobId: string): Promise<void> {
+    let originalFileIds = new Set<string>();
     try {
       await this.store.update(jobId, (job) => {
         job.status = 'processing';
         job.stage = 'reading';
       });
       const job = await this.store.read(jobId);
+      originalFileIds = new Set(job.files.map((file) => file.id));
       const sources = job.files.filter((file) => file.role === 'source');
-      for (const source of sources) {
+      const percentagePlan =
+        job.operation.kind === 'compress' && job.operation.mode === 'percent'
+          ? allocatePercentageTargets(
+              sources.map((source) => source.bytes),
+              job.operation.reductionPercent ?? 40,
+            )
+          : undefined;
+      for (const [index, source] of sources.entries()) {
         const latest = await this.store.read(jobId);
-        await this.withTimeout(this.processSource(latest, source, latest.operation));
+        const operation =
+          percentagePlan && latest.operation.kind === 'compress'
+            ? {
+                ...latest.operation,
+                mode: 'exact' as const,
+                targetBytes: percentagePlan.allocations[index]!,
+              }
+            : latest.operation;
+        await this.withTimeout(this.processSource(latest, source, operation));
       }
       await this.store.update(jobId, (record) => {
         record.status = 'complete';
@@ -188,6 +232,7 @@ export class ImageEngine {
       });
     } catch (error) {
       const friendly = friendlyError(error);
+      await this.store.rollbackFiles(jobId, originalFileIds).catch(() => undefined);
       await this.store
         .update(jobId, (job) => {
           job.status = 'error';
@@ -225,7 +270,7 @@ export class ImageEngine {
   async processSource(job: JobRecord, source: JobFile, operation: Operation): Promise<void> {
     const sourcePath = this.store.filePath(job.id, source.internalName);
     const metadata = source.metadata ?? (await this.inspect(sourcePath));
-    if ((metadata.pages ?? 1) > 1) {
+    if ((metadata.pages ?? 1) > 1 && operation.kind !== 'convert') {
       throw new AppError(
         'ANIMATION_UNSUPPORTED',
         'This animation will not be flattened. Animation processing is not enabled yet.',
@@ -243,7 +288,24 @@ export class ImageEngine {
       return;
     }
 
+    if (operation.kind === 'convert') {
+      const results = await this.renderConversion(sourcePath, metadata, operation);
+      for (const result of results) {
+        await this.persistResult(job, source, operation, result);
+      }
+      return;
+    }
+
     const result = await this.render(sourcePath, source, metadata, operation);
+    await this.persistResult(job, source, operation, result);
+  }
+
+  private async persistResult(
+    job: JobRecord,
+    source: JobFile,
+    operation: Operation,
+    result: RenderedOutput,
+  ): Promise<void> {
     await this.store.update(job.id, (record) => {
       record.stage = 'finalizing';
     });
@@ -252,6 +314,7 @@ export class ImageEngine {
     const internalName = `${id}.${details.extension}`;
     const outputPath = this.store.filePath(job.id, internalName);
     await writeFile(outputPath, result.buffer, { mode: 0o600 });
+    if (result.format === 'svg') await assertSafeSvg(outputPath);
     const validated = await this.inspect(outputPath);
     if (validated.format !== result.format || validated.width < 1 || validated.height < 1) {
       throw new AppError(
@@ -284,11 +347,14 @@ export class ImageEngine {
       );
     }
     const previewName = `${id}-preview.webp`;
-    await sharp(result.buffer)
+    await sharp(result.buffer, { page: 0, pages: 1, limitInputPixels: config.MAX_IMAGE_PIXELS })
       .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 78, effort: 3 })
       .toFile(this.store.filePath(job.id, previewName));
     const stem = basename(source.originalName, extname(source.originalName));
+    const indexSuffix = result.frameIndex
+      ? `-${result.nameKind ?? 'frame'}-${String(result.frameIndex).padStart(3, '0')}`
+      : '';
     const output: JobFile = {
       id,
       role: 'output',
@@ -296,14 +362,14 @@ export class ImageEngine {
       previewName,
       originalName: source.originalName,
       downloadName: this.store.safeDownloadName(
-        `${stem}-${this.suffix(operation)}.${details.extension}`,
+        `${stem}${indexSuffix || `-${this.suffix(operation)}`}.${details.extension}`,
         `result.${details.extension}`,
       ),
       mime: details.mime,
       format: result.format,
       bytes: result.buffer.length,
       width: validated.width,
-      height: validated.height,
+      height: validated.pageHeight ?? validated.height,
       sourceId: source.id,
       metadata: validated,
       savingsPercent: Number(
@@ -311,6 +377,9 @@ export class ImageEngine {
       ),
       ...(result.iterations ? { iterations: result.iterations } : {}),
       ...(result.note ? { note: result.note } : {}),
+      ...(result.frameIndex ? { frameIndex: result.frameIndex } : {}),
+      ...(result.frameCount ? { frameCount: result.frameCount } : {}),
+      ...(result.outputGroup ? { outputGroup: result.outputGroup } : {}),
     };
     await this.store.addFile(job.id, output);
   }
@@ -326,8 +395,8 @@ export class ImageEngine {
     path: string,
     source: JobFile,
     metadata: SafeMetadata,
-    operation: Exclude<Operation, { kind: 'favicon' }>,
-  ): Promise<{ buffer: Buffer; format: EncodableFormat; iterations?: number; note?: string }> {
+    operation: Exclude<Operation, { kind: 'favicon' } | { kind: 'convert' }>,
+  ): Promise<RenderedOutput & { format: EncodableFormat }> {
     const inputFormat = metadata.format as SupportedFormat;
     const requested =
       operation.kind === 'metadata' ? (operation.format ?? 'original') : operation.format;
@@ -513,8 +582,7 @@ export class ImageEngine {
     }
 
     if (format === 'jpeg' && metadata.hasAlpha) {
-      const background =
-        operation.kind === 'convert' ? (operation.background ?? '#ffffff') : '#ffffff';
+      const background = '#ffffff';
       pipeline = pipeline.flatten({ background });
     }
     const finalQuality =
@@ -522,6 +590,186 @@ export class ImageEngine {
         ? 100
         : quality;
     return { buffer: await encode(pipeline, format, finalQuality, preserve).toBuffer(), format };
+  }
+
+  private async renderConversion(
+    path: string,
+    metadata: SafeMetadata,
+    operation: ConvertOperation,
+  ): Promise<RenderedOutput[]> {
+    const pageCount = metadata.pages ?? 1;
+    const isAnimated = Boolean(metadata.animated);
+    const isMultiPageTiff = metadata.format === 'tiff' && pageCount > 1;
+    const preservesAnimation = operation.format === 'gif' || operation.format === 'webp';
+    const mode =
+      operation.animationMode ?? (isAnimated && preservesAnimation ? 'preserve' : undefined);
+
+    if (mode === 'preserve' && (!isAnimated || !preservesAnimation)) {
+      throw new AppError(
+        'INVALID_ANIMATION_MODE',
+        'Preserve animation is available only for animated GIF or WebP output.',
+      );
+    }
+    if (isAnimated && !preservesAnimation && !mode) {
+      throw new AppError(
+        'ANIMATION_CHOICE_REQUIRED',
+        'Choose Use first frame or Every frame as ZIP before converting this animation.',
+      );
+    }
+    if (isMultiPageTiff && !mode) {
+      throw new AppError(
+        'PAGE_CHOICE_REQUIRED',
+        'Choose Use first page or Every page as ZIP before converting this TIFF.',
+      );
+    }
+    if (mode === 'extract-frames' && pageCount > 100) {
+      throw new AppError(
+        'TOO_MANY_EXTRACTED_FRAMES',
+        'This file has more than 100 frames or pages. Choose the first frame/page instead.',
+      );
+    }
+
+    if (mode === 'preserve') {
+      let pipeline = sharp(path, {
+        animated: true,
+        pages: -1,
+        failOn: 'warning',
+        limitInputPixels: config.MAX_IMAGE_PIXELS,
+        sequentialRead: true,
+      }).rotate();
+      if (operation.format === 'gif' && metadata.hasAlpha === false)
+        pipeline = pipeline.removeAlpha();
+      const format = operation.format as 'gif' | 'webp';
+      return [
+        {
+          buffer: await encodeConversion(pipeline, format, operation, {
+            ...(metadata.delay ? { delay: metadata.delay } : {}),
+            ...(metadata.loop !== undefined ? { loop: metadata.loop } : {}),
+          }).toBuffer(),
+          format,
+          frameCount: pageCount,
+          outputGroup: `animation-${randomId(8)}`,
+          note: `Animation preserved: ${pageCount} frames${metadata.loop === 0 ? ', loops forever' : metadata.loop ? `, loops ${metadata.loop} times` : ''}.`,
+        },
+      ];
+    }
+
+    if (mode === 'extract-frames') {
+      const decoded = await sharp(path, {
+        animated: true,
+        pages: -1,
+        failOn: 'warning',
+        limitInputPixels: config.MAX_IMAGE_PIXELS,
+        sequentialRead: true,
+      })
+        .rotate()
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const frameHeight = Math.floor(decoded.info.height / pageCount);
+      if (frameHeight < 1 || frameHeight * pageCount !== decoded.info.height) {
+        throw new AppError('FRAME_DECODE_FAILED', 'The frame stack could not be decoded safely.');
+      }
+      const rowBytes = decoded.info.width * decoded.info.channels;
+      const frameBytes = rowBytes * frameHeight;
+      const group = `${isMultiPageTiff ? 'pages' : 'frames'}-${randomId(8)}`;
+      const outputs: RenderedOutput[] = [];
+      for (let index = 0; index < pageCount; index += 1) {
+        const frame = decoded.data.subarray(index * frameBytes, (index + 1) * frameBytes);
+        const pipeline = sharp(frame, {
+          raw: {
+            width: decoded.info.width,
+            height: frameHeight,
+            channels: decoded.info.channels,
+          },
+        });
+        const rendered = await this.encodeConversionPipeline(
+          pipeline,
+          operation,
+          Boolean(metadata.hasAlpha),
+        );
+        outputs.push({
+          ...rendered,
+          frameIndex: index + 1,
+          frameCount: pageCount,
+          outputGroup: group,
+          nameKind: isMultiPageTiff ? 'page' : 'frame',
+          note: isMultiPageTiff
+            ? `Page ${index + 1} of ${pageCount}. No animation timing was inferred.`
+            : `Frame ${index + 1} of ${pageCount}.`,
+        });
+      }
+      return outputs;
+    }
+
+    const density = metadata.format === 'svg' ? 72 * (operation.svgScale ?? 1) : undefined;
+    let pipeline = sharp(path, {
+      page: 0,
+      pages: 1,
+      failOn: 'warning',
+      limitInputPixels: config.MAX_IMAGE_PIXELS,
+      sequentialRead: true,
+      ...(density ? { density } : {}),
+    }).rotate();
+    const rendered = await this.encodeConversionPipeline(
+      pipeline,
+      operation,
+      Boolean(metadata.hasAlpha),
+    );
+    return [
+      {
+        ...rendered,
+        ...(pageCount > 1 ? { frameCount: 1 } : {}),
+        ...(pageCount > 1
+          ? {
+              note: isMultiPageTiff
+                ? `First page used from a ${pageCount}-page TIFF.`
+                : `First frame used from a ${pageCount}-frame animation.`,
+            }
+          : {}),
+      },
+    ];
+  }
+
+  private async encodeConversionPipeline(
+    initialPipeline: Sharp,
+    operation: ConvertOperation,
+    hasAlpha: boolean,
+  ): Promise<RenderedOutput> {
+    let pipeline = initialPipeline;
+    if (operation.format === 'svg') {
+      const embeddedFormat =
+        operation.svgEmbeddedFormat === 'auto' || !operation.svgEmbeddedFormat
+          ? hasAlpha
+            ? 'png'
+            : 'jpeg'
+          : operation.svgEmbeddedFormat;
+      if (embeddedFormat === 'jpeg')
+        pipeline = pipeline.flatten({ background: operation.background ?? '#ffffff' });
+      const encoded = await (
+        embeddedFormat === 'png'
+          ? pipeline.png({ compressionLevel: 9, adaptiveFiltering: true })
+          : pipeline.jpeg({
+              quality: operation.quality ?? 82,
+              progressive: true,
+              optimizeCoding: true,
+            })
+      ).toBuffer({ resolveWithObject: true });
+      const mime = embeddedFormat === 'png' ? 'image/png' : 'image/jpeg';
+      const svg = Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${encoded.info.width}" height="${encoded.info.height}" viewBox="0 0 ${encoded.info.width} ${encoded.info.height}"><image width="${encoded.info.width}" height="${encoded.info.height}" href="data:${mime};base64,${encoded.data.toString('base64')}"/></svg>`,
+      );
+      return {
+        buffer: svg,
+        format: 'svg',
+        note: 'Pixels are embedded inside SVG; this is not vector artwork.',
+      };
+    }
+    if (operation.format === 'jpeg' && hasAlpha) {
+      pipeline = pipeline.flatten({ background: operation.background ?? '#ffffff' });
+    }
+    const format = operation.format as ConverterRasterFormat;
+    return { buffer: await encodeConversion(pipeline, format, operation).toBuffer(), format };
   }
 
   private smartQuality(format: EncodableFormat): number {

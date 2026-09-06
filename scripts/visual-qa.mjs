@@ -39,14 +39,16 @@ try {
   await capture('home-selected', '/', {
     ready: async (currentPage) => {
       await currentPage.locator('input[type=file]').setInputFiles(photo);
-      await currentPage.getByRole('button', { name: /Process image/ }).scrollIntoViewIfNeeded();
+      await currentPage
+        .getByRole('button', { name: /(?:Process|Compress|Convert) image/ })
+        .scrollIntoViewIfNeeded();
     },
   });
 
   await capture('home-result', '/', {
     ready: async (currentPage) => {
       await currentPage.locator('input[type=file]').setInputFiles(photo);
-      await currentPage.getByRole('button', { name: /Process image/ }).click();
+      await currentPage.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
       await currentPage.getByRole('heading', { name: 'Results' }).waitFor({ timeout: 45_000 });
       await currentPage.getByRole('heading', { name: 'Results' }).scrollIntoViewIfNeeded();
     },
@@ -57,7 +59,7 @@ try {
     height: 844,
     ready: async (currentPage) => {
       await currentPage.locator('input[type=file]').setInputFiles(photo);
-      await currentPage.getByRole('button', { name: /Process image/ }).click();
+      await currentPage.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
       await currentPage.getByRole('heading', { name: 'Results' }).waitFor({ timeout: 45_000 });
       await currentPage.getByRole('heading', { name: 'Results' }).scrollIntoViewIfNeeded();
     },
@@ -69,7 +71,7 @@ try {
       await currentPage.getByLabel('Width').fill('640');
       await currentPage.getByLabel('Height').fill('360');
       await currentPage.getByLabel('Fit').selectOption('fill');
-      await currentPage.getByRole('button', { name: /Process image/ }).click();
+      await currentPage.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
       await currentPage.getByRole('heading', { name: 'Results' }).waitFor({ timeout: 45_000 });
       await currentPage.getByRole('heading', { name: 'Results' }).scrollIntoViewIfNeeded();
     },
@@ -78,7 +80,7 @@ try {
   await capture('convert-result', '/png-to-webp', {
     ready: async (currentPage) => {
       await currentPage.locator('input[type=file]').setInputFiles(transparent);
-      await currentPage.getByRole('button', { name: /Process image/ }).click();
+      await currentPage.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
       await currentPage.getByRole('heading', { name: 'Results' }).waitFor({ timeout: 45_000 });
       await currentPage.getByRole('heading', { name: 'Results' }).scrollIntoViewIfNeeded();
     },

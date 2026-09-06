@@ -1,5 +1,13 @@
 # Test evidence
 
+## In-progress feature pass (2026-09-05)
+
+Source baseline: `6a6d8b4b9c31defcfd9309bbf084dbd7f2915bb7` on `main`; worktree is intentionally modified by the word-cloud, converter, and percentage-compression implementation.
+
+Completed in Docker: `npm ci`, `npm run format:check`, `npm run typecheck`, and `npm test` (21 processor tests passed). The unit suite includes static converter outputs, SVG-wrapper safety, GIF/WebP animation preservation, explicit animation flattening, frame extraction, and deterministic percentage allocation.
+
+Blocked local gate: `docker build --target build -t compressimage-build-check:features .` was attempted three times and Docker BuildKit failed before compilation while resolving `docker.io/docker/dockerfile:1.7` with `DeadlineExceeded: context deadline exceeded`. The complete Compose gate, E2E, SEO, a11y, benchmark, Lighthouse, visual, and release-smoke steps are therefore unrun for this pass. **NOT READY FOR COOLIFY DEPLOYMENT.**
+
 ## Current production-equivalent local Docker gate (2026-08-23)
 
 This is the current release record. Older evidence is retained below as history.

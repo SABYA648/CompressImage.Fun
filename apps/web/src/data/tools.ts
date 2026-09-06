@@ -12,7 +12,8 @@ export type ToolKind =
   | 'prepare'
   | 'color-picker'
   | 'watermark'
-  | 'favicon';
+  | 'favicon'
+  | 'word-cloud';
 
 export interface ToolDefinition {
   id: string;
@@ -238,7 +239,7 @@ export const tools: ToolDefinition[] = [
     h1: 'Compress PNG images',
     lead: 'Keep transparency and choose lossless optimization or a smaller palette-based result.',
     accept: 'image/png,.png',
-    operation: { kind: 'compress', mode: 'lossless', format: 'png' },
+    operation: { kind: 'compress', mode: 'smart', format: 'png' },
   }),
   compression({
     id: 'compress-webp',
@@ -692,6 +693,36 @@ export const tools: ToolDefinition[] = [
     related: ['favicon-generator', 'image-metadata', 'compress-png', 'resize-image'],
     aliases: ['hex picker', 'pixel color', 'rgb picker', 'palette extractor', 'dominant color'],
     primaryIntent: 'image color picker',
+  },
+  {
+    id: 'word-cloud-generator',
+    slug: 'word-cloud-generator',
+    category: 'Create',
+    kind: 'word-cloud',
+    popular: true,
+    title: 'Free Word Cloud Generator | Browser-Only',
+    description:
+      'Create a beautiful, customizable word cloud from pasted text or weighted words. Export PNG, JPG, or WebP without uploading.',
+    h1: 'Create a word cloud',
+    lead: 'Paste text or weighted terms, tune the look, and download a high-resolution word cloud. Your words stay in this browser.',
+    steps: [
+      'Paste text or add weighted words.',
+      'Choose a tested preset or customize the layout.',
+      'Download a PNG, JPG, or WebP image.',
+    ],
+    notes: [
+      {
+        title: 'Browser-only',
+        text: 'Parsing, layout, preview, and downloads happen locally. This tool does not send your words to our processing API.',
+      },
+      {
+        title: 'Raster exports',
+        text: 'Download PNG, JPG, or WebP at the dimensions you choose. SVG export is intentionally not offered.',
+      },
+    ],
+    related: ['image-color-picker', 'favicon-generator', 'image-to-base64', 'compress-png'],
+    aliases: ['word cloud', 'tag cloud', 'word art', 'text cloud'],
+    primaryIntent: 'word cloud generator',
   },
   {
     id: 'favicon-generator',

@@ -22,6 +22,9 @@ interface JobFile {
   savingsPercent?: number;
   iterations?: number;
   note?: string;
+  frameIndex?: number;
+  frameCount?: number;
+  outputGroup?: string;
   metadata?: Record<string, any>;
 }
 interface PublicJob {
@@ -50,6 +53,7 @@ const stageLabel: Record<string, string> = {
   complete: 'Complete',
 };
 const formats = ['original', 'jpeg', 'png', 'webp', 'avif'];
+const converterFormats = ['jpeg', 'png', 'webp', 'avif', 'gif', 'tiff', 'svg'];
 const MAX_CLIENT_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_CLIENT_BATCH_BYTES = 500 * 1024 * 1024;
 const MAX_CLIENT_FILES = 50;
@@ -85,6 +89,22 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
   const [busy, setBusy] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const remembersMode = [
+      'image-compressor',
+      'compress-jpeg',
+      'compress-png',
+      'compress-webp',
+      'compress-avif',
+      'batch-compress-images',
+    ].includes(tool.id);
+    if (!remembersMode || tool.operation?.mode === 'exact') return;
+    const stored = sessionStorage.getItem('compressimage-compression-mode');
+    if (stored && ['smart', 'exact', 'quality', 'lossless', 'percent'].includes(stored)) {
+      setSettings((current) => ({ ...current, mode: stored }));
+    }
+  }, [tool.id]);
 
   useEffect(() => {
     track('tool_open', { tool_id: tool.id });
@@ -196,6 +216,9 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
     const next = { ...settings };
     if (next.kind === 'compress' && next.mode === 'exact')
       next.targetBytes = Math.round(targetValue * (targetUnit === 'MB' ? 1024 * 1024 : 1024));
+    if (next.kind === 'compress' && next.mode === 'percent') {
+      next.reductionPercent = Math.max(5, Math.min(90, Math.round(next.reductionPercent ?? 40)));
+    }
     return next;
   }, [settings, targetValue, targetUnit]);
 
@@ -270,6 +293,7 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
       setError('Enter a target greater than zero.');
       return;
     }
+    if (operation.kind === 'compress' && operation.mode === 'percent' && !files.length) return;
     setBusy(true);
     setError('');
     setJob(undefined);
@@ -512,6 +536,8 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
                       ? files[0].width / files[0].height
                       : undefined
                   }
+                  sourceBytes={files.reduce((sum, item) => sum + item.file.size, 0)}
+                  sourceCount={files.length}
                 />
                 <button
                   class="primary-button process-button"
@@ -525,7 +551,11 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
                       ? 'Inspect metadata'
                       : tool.kind === 'favicon'
                         ? 'Generate icons'
-                        : `Process ${files.length === 1 ? 'image' : `${files.length} images`}`}
+                        : tool.kind === 'convert'
+                          ? 'Convert image'
+                          : tool.kind === 'compress'
+                            ? `Compress ${files.length === 1 ? 'image' : 'images'}`
+                            : `Process ${files.length === 1 ? 'image' : `${files.length} images`}`}
                 </button>
               </aside>
             </div>
@@ -561,123 +591,167 @@ export default function ToolWorkspace({ tool }: { tool: ToolDefinition }) {
                 {inspectOnly ? (
                   <MetadataView files={sources} />
                 ) : (
-                  outputs.map((file) => {
-                    const source = sources.find((item) => item.id === file.sourceId);
-                    const originalUrl = files.find(
-                      (item) => item.file.name === source?.originalName,
-                    )?.url;
-                    const resultUrl = previewUrls[file.id];
-                    return (
-                      <div class="result-card" key={file.id}>
-                        <div>
-                          {resultUrl && (
-                            <ComparePreview
-                              originalUrl={originalUrl}
-                              resultUrl={resultUrl}
-                              name={file.originalName}
-                            />
-                          )}
-                        </div>
-                        <div>
-                          <span class="success-pill">
-                            {file.note?.startsWith('Already')
-                              ? 'Already small enough'
-                              : `${file.savingsPercent ?? 0}% saved`}
-                          </span>
-                          <h3>{file.downloadName}</h3>
-                          {file.note && <p>{file.note}</p>}
-                          <div class="result-metrics">
-                            <div class="metric">
-                              <span>Original</span>
-                              <strong>{bytesLabel(source?.bytes ?? 0)}</strong>
+                  <>
+                    {tool.kind === 'compress' && settings.mode === 'percent' && (
+                      <PercentageSummary
+                        originalBytes={sources.reduce((sum, file) => sum + file.bytes, 0)}
+                        targetBytes={Math.floor(
+                          sources.reduce((sum, file) => sum + file.bytes, 0) *
+                            (1 - Number(settings.reductionPercent ?? 40) / 100),
+                        )}
+                        outputBytes={outputs.reduce((sum, file) => sum + file.bytes, 0)}
+                        outputCount={outputs.length}
+                        resizedCount={
+                          outputs.filter((file) => {
+                            const source = sources.find(
+                              (candidate) => candidate.id === file.sourceId,
+                            );
+                            return (
+                              source &&
+                              (source.width !== file.width || source.height !== file.height)
+                            );
+                          }).length
+                        }
+                      />
+                    )}
+                    {outputs.slice(0, 12).map((file) => {
+                      const source = sources.find((item) => item.id === file.sourceId);
+                      const originalUrl = files.find(
+                        (item) => item.file.name === source?.originalName,
+                      )?.url;
+                      const resultUrl = previewUrls[file.id];
+                      return (
+                        <div class="result-card" key={file.id}>
+                          <div>
+                            {resultUrl && (
+                              <ComparePreview
+                                originalUrl={originalUrl}
+                                resultUrl={resultUrl}
+                                name={file.originalName}
+                              />
+                            )}
+                          </div>
+                          <div>
+                            <span class="success-pill">
+                              {file.note?.startsWith('Already')
+                                ? 'Already small enough'
+                                : `${file.savingsPercent ?? 0}% saved`}
+                            </span>
+                            <h3>{file.downloadName}</h3>
+                            {file.note && <p>{file.note}</p>}
+                            <div class="result-metrics">
+                              <div class="metric">
+                                <span>Original</span>
+                                <strong>{bytesLabel(source?.bytes ?? 0)}</strong>
+                              </div>
+                              <div class="metric">
+                                <span>Result</span>
+                                <strong>{bytesLabel(file.bytes)}</strong>
+                              </div>
+                              <div class="metric">
+                                <span>Dimensions</span>
+                                <strong>
+                                  {file.width > 0
+                                    ? `${file.width} × ${file.height}`
+                                    : 'Not applicable'}
+                                </strong>
+                              </div>
+                              <div class="metric">
+                                <span>Format</span>
+                                <strong>{file.format.toUpperCase()}</strong>
+                              </div>
+                              {(file.frameCount || Number(file.metadata?.pages ?? 1) > 1) && (
+                                <div class="metric">
+                                  <span>Frames / pages</span>
+                                  <strong>{file.frameCount ?? file.metadata?.pages ?? 1}</strong>
+                                </div>
+                              )}
+                              {file.metadata?.loop !== undefined && (
+                                <div class="metric">
+                                  <span>Loop</span>
+                                  <strong>
+                                    {file.metadata.loop === 0 ? 'Infinite' : file.metadata.loop}
+                                  </strong>
+                                </div>
+                              )}
                             </div>
-                            <div class="metric">
-                              <span>Result</span>
-                              <strong>{bytesLabel(file.bytes)}</strong>
-                            </div>
-                            <div class="metric">
-                              <span>Dimensions</span>
-                              <strong>
-                                {file.width > 0
-                                  ? `${file.width} × ${file.height}`
-                                  : 'Not applicable'}
-                              </strong>
-                            </div>
-                            <div class="metric">
-                              <span>Format</span>
-                              <strong>{file.format.toUpperCase()}</strong>
+                            <div class="result-actions">
+                              <button
+                                class="primary-button"
+                                type="button"
+                                onClick={() => download(file)}
+                              >
+                                Download
+                              </button>
+                              <button
+                                class="secondary-button"
+                                type="button"
+                                onClick={() =>
+                                  chain(file.id, {
+                                    kind: 'compress',
+                                    mode: 'smart',
+                                    format: 'original',
+                                  })
+                                }
+                              >
+                                Compress again
+                              </button>
+                              <button
+                                class="secondary-button"
+                                type="button"
+                                onClick={() =>
+                                  chain(file.id, {
+                                    kind: 'resize',
+                                    width: Math.min(file.width, 1200),
+                                    fit: 'inside',
+                                    format: 'original',
+                                    quality: 82,
+                                  })
+                                }
+                              >
+                                Resize
+                              </button>
+                              <button
+                                class="secondary-button"
+                                type="button"
+                                onClick={() =>
+                                  chain(file.id, {
+                                    kind: 'crop',
+                                    left: Math.round(file.width * 0.05),
+                                    top: Math.round(file.height * 0.05),
+                                    width: Math.round(file.width * 0.9),
+                                    height: Math.round(file.height * 0.9),
+                                    format: 'original',
+                                  })
+                                }
+                              >
+                                Crop
+                              </button>
+                              <button
+                                class="secondary-button"
+                                type="button"
+                                onClick={() =>
+                                  chain(file.id, {
+                                    kind: 'convert',
+                                    format: file.format === 'webp' ? 'jpeg' : 'webp',
+                                    quality: 82,
+                                  })
+                                }
+                              >
+                                Convert
+                              </button>
                             </div>
                           </div>
-                          <div class="result-actions">
-                            <button
-                              class="primary-button"
-                              type="button"
-                              onClick={() => download(file)}
-                            >
-                              Download
-                            </button>
-                            <button
-                              class="secondary-button"
-                              type="button"
-                              onClick={() =>
-                                chain(file.id, {
-                                  kind: 'compress',
-                                  mode: 'smart',
-                                  format: 'original',
-                                })
-                              }
-                            >
-                              Compress again
-                            </button>
-                            <button
-                              class="secondary-button"
-                              type="button"
-                              onClick={() =>
-                                chain(file.id, {
-                                  kind: 'resize',
-                                  width: Math.min(file.width, 1200),
-                                  fit: 'inside',
-                                  format: 'original',
-                                  quality: 82,
-                                })
-                              }
-                            >
-                              Resize
-                            </button>
-                            <button
-                              class="secondary-button"
-                              type="button"
-                              onClick={() =>
-                                chain(file.id, {
-                                  kind: 'crop',
-                                  left: Math.round(file.width * 0.05),
-                                  top: Math.round(file.height * 0.05),
-                                  width: Math.round(file.width * 0.9),
-                                  height: Math.round(file.height * 0.9),
-                                  format: 'original',
-                                })
-                              }
-                            >
-                              Crop
-                            </button>
-                            <button
-                              class="secondary-button"
-                              type="button"
-                              onClick={() =>
-                                chain(file.id, {
-                                  kind: 'convert',
-                                  format: file.format === 'webp' ? 'jpeg' : 'webp',
-                                  quality: 82,
-                                })
-                              }
-                            >
-                              Convert
-                            </button>
-                          </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                    {outputs.length > 12 && (
+                      <p class="muted">
+                        Showing the first 12 results. Download the ZIP for all {outputs.length}{' '}
+                        files.
+                      </p>
+                    )}
+                  </>
                 )}
                 <p class="muted">
                   Files delete automatically by{' '}
@@ -705,6 +779,8 @@ function Settings({
   targetUnit,
   setTargetUnit,
   sourceRatio,
+  sourceBytes,
+  sourceCount,
 }: any) {
   const update = (key: string, value: any) =>
     setSettings((current: Record<string, any>) => ({ ...current, [key]: value }));
@@ -714,16 +790,31 @@ function Settings({
         <fieldset class="setting-group">
           <legend>Mode</legend>
           <div class="mode-tabs">
-            {['smart', 'exact', 'quality', 'lossless'].map((mode) => (
+            {['smart', 'percent', 'exact', 'quality', 'lossless'].map((mode) => (
               <button
                 type="button"
                 class={settings.mode === mode ? 'active' : ''}
                 onClick={() => {
                   update('mode', mode);
+                  if (
+                    [
+                      'image-compressor',
+                      'compress-jpeg',
+                      'compress-png',
+                      'compress-webp',
+                      'compress-avif',
+                      'batch-compress-images',
+                    ].includes(tool.id)
+                  )
+                    sessionStorage.setItem('compressimage-compression-mode', mode);
                   track('mode_changed', { tool_id: tool.id, mode });
                 }}
               >
-                {mode === 'exact' ? 'Exact Size' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+                {mode === 'exact'
+                  ? 'Exact Size'
+                  : mode === 'percent'
+                    ? 'Reduce by %'
+                    : mode.charAt(0).toUpperCase() + mode.slice(1)}
               </button>
             ))}
           </div>
@@ -766,6 +857,34 @@ function Settings({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+        {settings.mode === 'percent' && (
+          <div class="field">
+            <label for="reduction-percent">Reduce by {settings.reductionPercent ?? 40}%</label>
+            <div class="range-row">
+              <input
+                id="reduction-percent"
+                type="range"
+                min="5"
+                max="90"
+                step="1"
+                value={settings.reductionPercent ?? 40}
+                aria-valuetext={`${settings.reductionPercent ?? 40}% smaller; combined target ${bytesLabel(Math.floor(sourceBytes * (1 - Number(settings.reductionPercent ?? 40) / 100)))}`}
+                onInput={(event) => update('reductionPercent', Number(event.currentTarget.value))}
+              />
+              <output>{settings.reductionPercent ?? 40}%</output>
+            </div>
+            <p class="target-copy">
+              Original combined size: {bytesLabel(sourceBytes)}
+              <br />
+              Combined output target:{' '}
+              {bytesLabel(
+                Math.floor(sourceBytes * (1 - Number(settings.reductionPercent ?? 40) / 100)),
+              )}{' '}
+              or less for {sourceCount} {sourceCount === 1 ? 'image' : 'images'}. Actual output size
+              is measured after compression.
+            </p>
           </div>
         )}
         {settings.mode === 'quality' && (
@@ -952,21 +1071,23 @@ function Settings({
   if (tool.kind === 'convert')
     return (
       <>
-        <FormatField value={settings.format} update={update} noOriginal />
-        <div class="field">
-          <label for="quality">Quality</label>
-          <div class="range-row">
-            <input
-              id="quality"
-              type="range"
-              min="1"
-              max="100"
-              value={settings.quality ?? 82}
-              onInput={(event) => update('quality', Number(event.currentTarget.value))}
-            />
-            <output>{settings.quality ?? 82}</output>
+        <FormatField value={settings.format} update={update} converterOnly />
+        {['jpeg', 'webp', 'avif'].includes(settings.format) && (
+          <div class="field">
+            <label for="quality">Quality</label>
+            <div class="range-row">
+              <input
+                id="quality"
+                type="range"
+                min="1"
+                max="100"
+                value={settings.quality ?? 82}
+                onInput={(event) => update('quality', Number(event.currentTarget.value))}
+              />
+              <output>{settings.quality ?? 82}</output>
+            </div>
           </div>
-        </div>
+        )}
         {settings.format === 'jpeg' && (
           <div class="field">
             <label for="background">Transparency background</label>
@@ -978,6 +1099,99 @@ function Settings({
             />
           </div>
         )}
+        {settings.format === 'gif' && (
+          <details open>
+            <summary>GIF color controls</summary>
+            <div class="field">
+              <label for="gif-colours">Colors</label>
+              <input
+                id="gif-colours"
+                type="number"
+                min="2"
+                max="256"
+                value={settings.gifColours ?? 256}
+                onInput={(event) => update('gifColours', Number(event.currentTarget.value))}
+              />
+            </div>
+            <div class="field">
+              <label for="gif-dither">Dithering</label>
+              <div class="range-row">
+                <input
+                  id="gif-dither"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={settings.gifDither ?? 1}
+                  onInput={(event) => update('gifDither', Number(event.currentTarget.value))}
+                />
+                <output>{Math.round((settings.gifDither ?? 1) * 100)}%</output>
+              </div>
+            </div>
+          </details>
+        )}
+        {settings.format === 'tiff' && (
+          <div class="field">
+            <label for="tiff-compression">TIFF compression</label>
+            <select
+              id="tiff-compression"
+              value={settings.tiffCompression ?? 'lzw'}
+              onChange={(event) => update('tiffCompression', event.currentTarget.value)}
+            >
+              <option value="lzw">Lossless LZW</option>
+              <option value="deflate">Lossless Deflate</option>
+              <option value="jpeg">JPEG compression</option>
+            </select>
+          </div>
+        )}
+        {settings.format === 'svg' && (
+          <details open>
+            <summary>SVG wrapper (not vectorized)</summary>
+            <p class="muted">Pixels are embedded inside SVG; this is not vector artwork.</p>
+            <div class="field">
+              <label for="svg-embedded-format">Embedded pixels</label>
+              <select
+                id="svg-embedded-format"
+                value={settings.svgEmbeddedFormat ?? 'auto'}
+                onChange={(event) => update('svgEmbeddedFormat', event.currentTarget.value)}
+              >
+                <option value="auto">Auto (PNG for alpha, JPEG otherwise)</option>
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+              </select>
+            </div>
+          </details>
+        )}
+        <div class="field">
+          <label for="animation-mode">Animated GIF/WebP or multi-page TIFF</label>
+          <select
+            id="animation-mode"
+            value={settings.animationMode ?? ''}
+            onChange={(event) => update('animationMode', event.currentTarget.value || undefined)}
+          >
+            <option value="">Choose automatically for static files</option>
+            {(settings.format === 'gif' || settings.format === 'webp') && (
+              <option value="preserve">Preserve animation</option>
+            )}
+            <option value="first-frame">Use first frame/page</option>
+            <option value="extract-frames">Every frame/page as ZIP</option>
+          </select>
+        </div>
+        <details>
+          <summary>SVG input</summary>
+          <div class="field">
+            <label for="svg-scale">Rasterization scale</label>
+            <select
+              id="svg-scale"
+              value={settings.svgScale ?? 1}
+              onChange={(event) => update('svgScale', Number(event.currentTarget.value))}
+            >
+              <option value="1">1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+          </div>
+        </details>
       </>
     );
   if (tool.kind === 'watermark')
@@ -1235,10 +1449,12 @@ function FormatField({
   value,
   update,
   noOriginal = false,
+  converterOnly = false,
 }: {
   value?: string;
   update: (key: string, value: any) => void;
   noOriginal?: boolean;
+  converterOnly?: boolean;
 }) {
   return (
     <div class="field">
@@ -1252,7 +1468,7 @@ function FormatField({
           track('format_changed', { format: next });
         }}
       >
-        {formats
+        {(converterOnly ? converterFormats : formats)
           .filter((format) => !noOriginal || format !== 'original')
           .map((format) => (
             <option value={format}>
@@ -1260,6 +1476,36 @@ function FormatField({
             </option>
           ))}
       </select>
+    </div>
+  );
+}
+
+function PercentageSummary({
+  originalBytes,
+  targetBytes,
+  outputBytes,
+  outputCount,
+  resizedCount,
+}: {
+  originalBytes: number;
+  targetBytes: number;
+  outputBytes: number;
+  outputCount: number;
+  resizedCount: number;
+}) {
+  const saved = originalBytes
+    ? Math.max(0, ((originalBytes - outputBytes) / originalBytes) * 100)
+    : 0;
+  return (
+    <div class="percentage-summary" role="status">
+      <strong>Batch target met</strong>
+      <span>
+        Original {bytesLabel(originalBytes)} · target {bytesLabel(targetBytes)} or less
+      </span>
+      <span>
+        Actual {bytesLabel(outputBytes)} · {saved.toFixed(1)}% saved · {outputCount} images ·{' '}
+        {resizedCount} resized
+      </span>
     </div>
   );
 }

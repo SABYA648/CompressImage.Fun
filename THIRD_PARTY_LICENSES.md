@@ -6,6 +6,7 @@ This inventory records major runtime components. `package-lock.json` is the exac
 | ---------- | -------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | Astro      | Static web build     | MIT               | Editorial pages and tool shells                                                                                           |
 | Preact     | Interactive islands  | MIT               | Workspace and Base64 UI                                                                                                   |
+| d3-cloud   | Browser word layouts | BSD-3-Clause      | Bundled only by the word-cloud workspace; no CDN or processing API is used                                                |
 | Fastify    | Processing API       | MIT               | HTTP and multipart boundary                                                                                               |
 | Sharp      | Node image API       | Apache-2.0        | Uses libvips                                                                                                              |
 | libvips    | Native processing    | LGPL-2.1-or-later | Dynamically used through Sharp's distribution; preserve notices and source offer obligations that apply to redistribution |

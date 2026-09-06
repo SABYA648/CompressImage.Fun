@@ -26,6 +26,7 @@
     "test:a11y": "playwright test tests/e2e/accessibility.spec.ts",
     "benchmark:compression": "node scripts/benchmark-compression.mjs",
     "benchmark:exact": "node scripts/benchmark-exact-size.mjs",
+    "benchmark:conversion": "node scripts/benchmark-conversion.mjs",
     "test:load": "node scripts/load-test.mjs",
     "test:lighthouse": "node scripts/lighthouse.mjs",
     "test:visual": "node scripts/visual-qa.mjs"

@@ -90,6 +90,17 @@ export class JobStore {
     await this.update(id, (job) => job.files.push(file));
   }
 
+  async rollbackFiles(id: string, keepIds: Set<string>): Promise<void> {
+    const job = await this.read(id);
+    const discarded = job.files.filter((file) => !keepIds.has(file.id));
+    for (const file of discarded) {
+      await rm(this.filePath(id, file.internalName), { force: true });
+      if (file.previewName) await rm(this.filePath(id, file.previewName), { force: true });
+    }
+    job.files = job.files.filter((file) => keepIds.has(file.id));
+    await this.save(job);
+  }
+
   safeDownloadName(name: string, fallback: string): string {
     const cleaned = sanitize(name, { replacement: '-' }).replace(/^\.+/, '').slice(0, 180);
     return cleaned || fallback;

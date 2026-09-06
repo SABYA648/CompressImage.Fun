@@ -32,6 +32,12 @@ import SiteLayout from '../../layouts/SiteLayout.astro';
           bytes, our exact-size engine executes a bounded, measured search to find the highest
           possible visual quality that strictly satisfies your target limit.
         </p>
+        <p>
+          Reduce by % uses the same measured optimizer. For a batch, it first calculates one
+          combined target, allocates deterministic per-file byte ceilings in proportion to source
+          size, and only reports the final measured output. It never promises an exact byte count
+          before encoding.
+        </p>
         <p>The optimization pipeline follows four deterministic phases:</p>
         <ol>
           <li>

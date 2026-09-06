@@ -17,7 +17,7 @@ test('homepage compresses, reports result, downloads, chains, and deletes', asyn
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Compress images');
   await page.locator('input[type=file]').setInputFiles(photo);
-  await page.getByRole('button', { name: /Process image/ }).click();
+  await page.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText(/% saved|Already small enough/).first()).toBeVisible();
   const download = page.waitForEvent('download');
@@ -32,7 +32,7 @@ test('homepage compresses, reports result, downloads, chains, and deletes', asyn
 test('50 KB preset produces a validated output at or under the cap', async ({ page }) => {
   await page.goto('/compress-image-to-50kb');
   await page.locator('input[type=file]').setInputFiles(photo);
-  await page.getByRole('button', { name: /Process image/ }).click();
+  await page.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });
   const resultText = await page.locator('.result-card').first().textContent();
   expect(resultText).toMatch(/Result/);
@@ -44,7 +44,7 @@ test('resizer applies exact dimensions and exposes continuation actions', async 
   await page.getByLabel('Width').fill('640');
   await page.getByLabel('Height').fill('360');
   await page.getByLabel('Fit').selectOption('fill');
-  await page.getByRole('button', { name: /Process image/ }).click();
+  await page.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });
   await expect(page.locator('.result-card').first()).toContainText('640 × 360');
   await expect(page.getByRole('button', { name: 'Crop' }).first()).toBeVisible();
@@ -53,7 +53,7 @@ test('resizer applies exact dimensions and exposes continuation actions', async 
 test('converter preserves alpha in PNG to WebP and produces a result', async ({ page }) => {
   await page.goto('/png-to-webp');
   await page.locator('input[type=file]').setInputFiles(transparent);
-  await page.getByRole('button', { name: /Process image/ }).click();
+  await page.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });
   await expect(page.locator('.result-card').first()).toContainText('WEBP');
 });
@@ -64,7 +64,7 @@ test('HEIC to JPG uses a real HEVC fixture when supported by the production code
   await access(heic);
   await page.goto('/heic-to-jpg');
   await page.locator('input[type=file]').setInputFiles(heic);
-  await page.getByRole('button', { name: /Process image/ }).click();
+  await page.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });
   await expect(page.locator('.result-card').first()).toContainText('JPEG');
 });
@@ -121,7 +121,7 @@ test('metadata can be inspected and removed', async ({ page }) => {
   await expect(page.getByText('JPEG', { exact: true })).toBeVisible();
   await page.goto('/remove-image-metadata');
   await page.locator('input[type=file]').setInputFiles(photo);
-  await page.getByRole('button', { name: /Process image/ }).click();
+  await page.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
   await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 30_000 });
 });
 
@@ -129,7 +129,7 @@ for (const route of ['/passport-photo-resizer', '/photo-signature-resizer']) {
   test(`${route} prepares exact pixels and maximum KB`, async ({ page }) => {
     await page.goto(route);
     await page.locator('input[type=file]').setInputFiles(photo);
-    await page.getByRole('button', { name: /Process image/ }).click();
+    await page.getByRole('button', { name: /(?:Process|Compress|Convert) image/ }).click();
     await expect(page.getByRole('heading', { name: 'Results' })).toBeVisible({ timeout: 45_000 });
     await expect(page.locator('.result-card').first()).toContainText(
       route.includes('passport') ? '600 × 600' : '300 × 100',
@@ -193,7 +193,7 @@ test('every tool page pattern exposes five useful stories and guides contain the
   await page.locator('.guide-tool input[type=file]').setInputFiles(photo);
   await page
     .locator('.guide-tool')
-    .getByRole('button', { name: /Process image/ })
+    .getByRole('button', { name: /(?:Process|Compress|Convert) image/ })
     .click();
   await expect(page.locator('.guide-tool').getByRole('heading', { name: 'Results' })).toBeVisible({
     timeout: 45_000,
@@ -208,7 +208,7 @@ test('404 is noindex, animated, and includes a working compressor', async ({ pag
   await page.locator('#quick-compressor input[type=file]').setInputFiles(photo);
   await page
     .locator('#quick-compressor')
-    .getByRole('button', { name: /Process image/ })
+    .getByRole('button', { name: /(?:Process|Compress|Convert) image/ })
     .click();
   await expect(
     page.locator('#quick-compressor').getByRole('heading', { name: 'Results' }),

@@ -8,7 +8,7 @@ The production domain is intended to be [compressimage.fun](https://compressimag
 
 ## What it is
 
-compressimage.fun is a no-login image utility built around an excellent compressor. It handles ordinary quality compression, exact KB/MB limits, batch jobs, resize, crop, rotation, format conversion, metadata inspection/removal, text watermarks, favicons, and browser-only Base64 workflows.
+compressimage.fun is a no-login image utility built around an excellent compressor. It handles ordinary quality compression, exact KB/MB limits, whole-batch percentage targets, resize, crop, rotation, format conversion, metadata inspection/removal, text watermarks, favicons, word clouds, and browser-only Base64 workflows.
 
 ## Why it exists
 
@@ -16,12 +16,12 @@ Image chores are usually split across unrelated sites with unclear limits. This 
 
 ## Features
 
-- Smart, Quality, Lossless, and Exact Size compression
+- Smart, Quality, Lossless, Exact Size, and Reduce by % compression
 - Highest practical quality at or below a requested byte cap
 - Batch processing with individual downloads and ZIP export
 - JPG, PNG, WebP, AVIF, HEIC/HEIF, TIFF, GIF, and safe SVG input detection
 - Resize, crop, rotate, convert, passport/form photo, photo/signature, metadata, watermark, and favicon operations
-- Browser-local Image to PDF and image color picker workflows
+- Browser-local Image to PDF, image color picker, and word-cloud workflows
 - Browser-only Base64 encode, decode, viewer, and Data URI tools
 - Private capability-token jobs, Delete now, and automatic four-hour cleanup
 - Static Astro pages, controlled SEO routes, sitemap, robots.txt, and llms.txt
@@ -36,22 +36,22 @@ Nginx serves the static Astro build and proxies same-origin `/api` requests to a
 
 ## Supported formats
 
-| Input             |                            Inspect |             Compress/transform | Output                |
-| ----------------- | ---------------------------------: | -----------------------------: | --------------------- |
-| JPEG/JPG          |                                Yes |                            Yes | JPEG, PNG, WebP, AVIF |
-| PNG               |                                Yes |           Yes, including alpha | JPEG, PNG, WebP, AVIF |
-| WebP              |                                Yes |                    Yes, static | JPEG, PNG, WebP, AVIF |
-| AVIF              |                                Yes |                    Yes, static | JPEG, PNG, WebP, AVIF |
-| HEIC/HEIF         | When production libvips decodes it |              Convert/transform | JPEG, PNG, WebP, AVIF |
-| TIFF              |                                Yes |        Yes, first static image | JPEG, PNG, WebP, AVIF |
-| SVG               |              Safe inert input only |                      Rasterize | PNG, JPEG, WebP, AVIF |
-| Animated GIF/WebP |                           Detected | Rejected rather than flattened | Deferred              |
+| Input             |                            Inspect |            Compress/transform | Output                                           |
+| ----------------- | ---------------------------------: | ----------------------------: | ------------------------------------------------ |
+| JPEG/JPG          |                                Yes |                           Yes | JPEG, PNG, WebP, AVIF, GIF, TIFF, SVG wrapper    |
+| PNG               |                                Yes |          Yes, including alpha | JPEG, PNG, WebP, AVIF, GIF, TIFF, SVG wrapper    |
+| WebP              |                                Yes |     Static and animated paths | JPEG, PNG, WebP, AVIF, GIF, TIFF, SVG wrapper    |
+| AVIF              |                                Yes |                           Yes | JPEG, PNG, WebP, AVIF, GIF, TIFF, SVG wrapper    |
+| HEIC/HEIF         | When production libvips decodes it |             Convert/transform | JPEG, PNG, WebP, AVIF, GIF, TIFF, SVG wrapper    |
+| TIFF              |                                Yes | First page or ZIP page export | JPEG, PNG, WebP, AVIF, GIF, TIFF, SVG wrapper    |
+| SVG               |              Safe inert input only |                     Rasterize | PNG, JPEG, WebP, AVIF, GIF, TIFF                 |
+| Animated GIF/WebP |                           Detected | Preserve, first frame, or ZIP | GIF and WebP animation; static converter formats |
 
 Actual production-format evidence is recorded in [test evidence](docs/test-evidence.md).
 
 ## File retention and privacy
 
-Server tools upload to the same origin and store files temporarily. Files delete automatically within `FILE_TTL_SECONDS`, four hours by default, and Delete now removes the job immediately. Base64 tools do not upload file or text contents. See [Privacy model](docs/privacy-model.md).
+Server tools upload to the same origin and store files temporarily. Files delete automatically within `FILE_TTL_SECONDS`, four hours by default, and Delete now removes the job immediately. Base64 and word-cloud tools do not upload file or text contents. See [Privacy model](docs/privacy-model.md).
 
 ## Development
 
