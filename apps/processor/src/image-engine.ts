@@ -703,7 +703,7 @@ export class ImageEngine {
     }
 
     const density = metadata.format === 'svg' ? 72 * (operation.svgScale ?? 1) : undefined;
-    let pipeline = sharp(path, {
+    const pipeline = sharp(path, {
       page: 0,
       pages: 1,
       failOn: 'warning',
